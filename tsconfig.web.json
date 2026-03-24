@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "jsx": "react-jsx",
+    "outDir": "./out",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/renderer/main/src/*"],
+      "@overlay/*": ["./src/renderer/overlay/src/*"],
+      "@status/*": ["./src/renderer/status/src/*"],
+      "@shared/*": ["./src/shared/*"]
+    }
+  },
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/shared/**/*.ts"
+  ]
+}

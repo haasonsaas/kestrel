@@ -1,0 +1,225 @@
+/**
+ * Presenter Agent — crafts user-facing responses, manages streaming to the renderer.
+ * Takes execution results from the Executor and handles all UI-facing concerns.
+ *
+ * Responsibilities:
+ * - Build the system prompt (tone, identity, context injection)
+ * - Stream text chunks to the renderer via IPC
+ * - Send tool start/end notifications to the renderer
+ * - Save completed messages to the database
+ * - Auto-title threads
+ * - Track presentation metrics via wide events
+ *
+ * Does NOT:
+ * - Execute tool calls
+ * - Fetch screen context
+ * - Talk to MCP servers
+ * - Parse API responses
+ */
+
+import { v4 as uuid } from 'uuid'
+import { buildSystemMessage } from './context-builder'
+import {
+  gatherContext,
+  runExecutionLoop,
+  setExecutorDeps,
+  type ExecutionContext,
+  type ToolExecutionResult
+} from './executor-agent'
+import { WideEvent } from '../observability/wide-event'
+import { getDatabase } from '../db'
+import * as schema from '../db/schema'
+import { eq } from 'drizzle-orm'
+import type { ChatMessage } from './openrouter'
+import type { ContextKitClient } from '../native/contextkit-client'
+import type { MCPServerManager } from '../mcp/manager'
+import type { ChatRequest } from '../../shared/ipc'
+
+let contextKitRef: ContextKitClient | null = null
+
+export function setPresenterDeps(
+  contextKit: ContextKitClient | null,
+  mcpManager?: MCPServerManager | null
+): void {
+  contextKitRef = contextKit
+  // Pass through to executor
+  setExecutorDeps(contextKit, mcpManager)
+}
+
+/**
+ * Handle a streaming chat request end-to-end.
+ * Orchestrates the Executor for work and handles all renderer communication.
+ */
+export async function handleChatStream(
+  sender: Electron.WebContents,
+  request: ChatRequest
+): Promise<void> {
+  const db = getDatabase()
+  const event = WideEvent.start('chat_stream', {
+    thread_id: request.threadId,
+    model: request.model,
+    include_context: request.includeContext !== false,
+    message_count: request.messages.length
+  })
+
+  // ── Phase 1: Executor gathers context ──
+  const execCtx = await gatherContext(request.includeContext !== false)
+
+  if (execCtx.contextResult) {
+    console.log(`[presenter] Context: ${execCtx.contextResult.block.length} chars, hasText=${execCtx.contextResult.hasVisibleText}`)
+  }
+
+  // ── Phase 2: Presenter builds the conversation ──
+  const messages = buildConversation(request, execCtx)
+
+  // ── Phase 3: Executor runs the model + tool loop ──
+  runExecutionLoop(
+    messages,
+    request.model,
+    execCtx.openaiTools,
+    {
+      // Presenter streams text to renderer
+      onTextChunk: (chunk) => {
+        if (!sender.isDestroyed()) {
+          sender.send('ai:streamChunk', {
+            threadId: request.threadId,
+            chunk
+          })
+        }
+      },
+
+      // Presenter notifies renderer about tool execution
+      onToolStart: (toolName, serverName) => {
+        if (!sender.isDestroyed()) {
+          sender.send('ai:toolStart', { threadId: request.threadId, toolName, serverName })
+        }
+      },
+
+      onToolEnd: (toolName, serverName, success, error) => {
+        if (!sender.isDestroyed()) {
+          sender.send('ai:toolEnd', {
+            threadId: request.threadId,
+            toolName,
+            serverName,
+            success,
+            error
+          })
+        }
+      },
+
+      // Presenter finalizes: save to DB, notify renderer, track metrics
+      onDone: (fullText, toolResults) => {
+        event.setMany({
+          response_length: fullText.length,
+          tool_calls: toolResults.length,
+          tool_errors: toolResults.filter(r => !r.success).length,
+          has_context: execCtx.contextResult !== null,
+          has_visible_text: execCtx.contextResult?.hasVisibleText ?? false
+        })
+        event.finish()
+
+        finalize(sender, request, fullText, toolResults, db)
+      },
+
+      // Presenter handles errors
+      onError: (error) => {
+        event.fail(error)
+        if (!sender.isDestroyed()) {
+          sender.send('ai:streamError', {
+            threadId: request.threadId,
+            error
+          })
+        }
+      }
+    }
+  )
+}
+
+/**
+ * Build the full conversation array from request + execution context.
+ * This is the Presenter's job — deciding what the AI sees.
+ */
+function buildConversation(
+  request: ChatRequest,
+  execCtx: ExecutionContext
+): ChatMessage[] {
+  const messages: ChatMessage[] = []
+
+  // System prompt — Presenter decides the AI's identity and tone
+  const systemPrompt = buildSystemMessage(execCtx.contextResult, execCtx.mcpToolsBlock)
+  messages.push({ role: 'system', content: systemPrompt })
+
+  // Conversation history (skip renderer-side system messages)
+  for (const msg of request.messages) {
+    if (msg.role !== 'system') {
+      messages.push({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      })
+    }
+  }
+
+  return messages
+}
+
+/**
+ * Finalize a completed response — save to DB, notify renderer, auto-title.
+ */
+function finalize(
+  sender: Electron.WebContents,
+  request: ChatRequest,
+  fullText: string,
+  toolResults: ToolExecutionResult[],
+  db: ReturnType<typeof getDatabase>
+): void {
+  // Notify renderer that streaming is complete
+  if (!sender.isDestroyed()) {
+    sender.send('ai:streamEnd', { threadId: request.threadId })
+  }
+
+  // Save assistant message to DB
+  db.insert(schema.messages).values({
+    id: uuid(),
+    threadId: request.threadId,
+    role: 'assistant',
+    content: fullText,
+    model: request.model,
+    toolCalls: toolResults.length > 0
+      ? JSON.stringify(toolResults.map(r => ({
+          tool: `${r.serverName}/${r.toolName}`,
+          success: r.success,
+          durationMs: r.durationMs
+        })))
+      : undefined,
+    createdAt: new Date()
+  }).run()
+
+  // Update thread timestamp
+  db.update(schema.threads)
+    .set({ updatedAt: new Date() })
+    .where(eq(schema.threads.id, request.threadId))
+    .run()
+
+  // Auto-title thread from first user message
+  autoTitle(request.threadId, request.messages)
+}
+
+function autoTitle(
+  threadId: string,
+  messages: Array<{ role: string; content: string }>
+): void {
+  const db = getDatabase()
+  const thread = db.select().from(schema.threads).where(eq(schema.threads.id, threadId)).get()
+  if (!thread || thread.title !== 'New Chat') return
+
+  const userMessages = messages.filter(m => m.role === 'user')
+  if (userMessages.length === 0) return
+
+  const first = userMessages[0].content
+  const title = first.length > 50 ? first.slice(0, 50) + '...' : first
+
+  db.update(schema.threads)
+    .set({ title })
+    .where(eq(schema.threads.id, threadId))
+    .run()
+}

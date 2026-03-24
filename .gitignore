@@ -1,0 +1,18 @@
+node_modules/
+out/
+dist/
+dev.db
+*.db
+*.db-journal
+*.db-wal
+.DS_Store
+_reference/
+
+# Native builds
+native/contextkit/.build/
+
+# Environment
+.env
+.env.local
+kestrel-app/
+release/
