@@ -89,6 +89,9 @@ export type IpcEvents = {
   'meeting:transcriptChunk': { meetingId: string; text: string }
   'mcp:statusUpdate': MCPServerStatus[]
   'app:newChat': Record<string, never>
+  'hummingbird:voiceMode': { active: boolean }
+  'hummingbird:voiceTranscript': { text: string }
+  'hummingbird:voiceRecording': { recording: boolean }
 }
 
 // Data types

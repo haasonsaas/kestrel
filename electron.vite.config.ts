@@ -21,7 +21,8 @@ export default defineConfig({
         input: {
           main: resolve(__dirname, 'src/preload/main.ts'),
           overlay: resolve(__dirname, 'src/preload/overlay.ts'),
-          status: resolve(__dirname, 'src/preload/status.ts')
+          status: resolve(__dirname, 'src/preload/status.ts'),
+          hummingbird: resolve(__dirname, 'src/preload/hummingbird.ts')
         }
       }
     }
@@ -33,6 +34,7 @@ export default defineConfig({
         '@': resolve('src/renderer/main/src'),
         '@overlay': resolve('src/renderer/overlay/src'),
         '@status': resolve('src/renderer/status/src'),
+        '@hummingbird': resolve('src/renderer/hummingbird/src'),
         '@shared': resolve('src/shared')
       }
     },
@@ -41,7 +43,8 @@ export default defineConfig({
         input: {
           main: resolve(__dirname, 'src/renderer/main/index.html'),
           overlay: resolve(__dirname, 'src/renderer/overlay/index.html'),
-          status: resolve(__dirname, 'src/renderer/status/index.html')
+          status: resolve(__dirname, 'src/renderer/status/index.html'),
+          hummingbird: resolve(__dirname, 'src/renderer/hummingbird/index.html')
         }
       }
     }

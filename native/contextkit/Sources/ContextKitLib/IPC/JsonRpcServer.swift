@@ -1,3 +1,4 @@
+import Cocoa
 import Foundation
 
 /// JSON-RPC 2.0 request
@@ -74,6 +75,7 @@ public final class JsonRpcServer {
     private let decoder = JSONDecoder()
     private var running = true
     private let recorder = MeetingRecorder()
+    private var modifierTapMonitor: ModifierTapMonitor?
 
     public init() {
         encoder.outputFormatting = []
@@ -131,6 +133,18 @@ public final class JsonRpcServer {
         case "checkPermissions":
             dispatchToMain { [self] in
                 let resp = handleCheckPermissions(id: request.id)
+                send(resp)
+            }
+            return
+        case "configureModifierTapMonitor":
+            dispatchToMain { [self] in
+                let resp = handleConfigureModifierTapMonitor(id: request.id, params: request.params)
+                send(resp)
+            }
+            return
+        case "stopModifierTapMonitor":
+            dispatchToMain { [self] in
+                let resp = handleStopModifierTapMonitor(id: request.id)
                 send(resp)
             }
             return
@@ -277,6 +291,76 @@ public final class JsonRpcServer {
             "micBufferCount": s.micBufferCount
         ]
         return JsonRpcResponse(id: id, result: AnyCodable(dict), error: nil)
+    }
+
+    // MARK: - Modifier tap monitor handlers
+
+    private func handleConfigureModifierTapMonitor(id: String?, params: [String: AnyCodable]?) -> JsonRpcResponse {
+        // Stop any existing monitor first
+        modifierTapMonitor?.stop()
+
+        // Parse optional params with defaults
+        let requiredTaps = (params?["requiredTaps"]?.value as? Int) ?? 2
+        let tapInterval = (params?["tapInterval"]?.value as? Double) ?? 0.4
+        let maxHoldDuration = (params?["maxHoldDuration"]?.value as? Double) ?? 0.3
+
+        // Parse modifier flag (default: option)
+        let modifier: NSEvent.ModifierFlags
+        if let modifierName = params?["modifier"]?.value as? String {
+            switch modifierName.lowercased() {
+            case "option", "alt":
+                modifier = .option
+            case "control", "ctrl":
+                modifier = .control
+            case "command", "cmd":
+                modifier = .command
+            case "shift":
+                modifier = .shift
+            default:
+                modifier = .option
+            }
+        } else {
+            modifier = .option
+        }
+
+        let monitor = ModifierTapMonitor(
+            modifier: modifier,
+            requiredTaps: requiredTaps,
+            tapInterval: tapInterval,
+            maxHoldDuration: maxHoldDuration
+        ) { [weak self] event in
+            guard let self = self else { return }
+            let eventType: String
+            switch event {
+            case .tap:
+                eventType = "modifierTap"
+            case .holdStarted:
+                eventType = "modifierHoldStarted"
+            case .holdReleased:
+                eventType = "modifierHoldReleased"
+            }
+            // Send a JSON-RPC notification (id: null)
+            self.send(JsonRpcResponse(
+                id: nil,
+                result: AnyCodable(["type": eventType]),
+                error: nil
+            ))
+        }
+
+        monitor.start()
+        modifierTapMonitor = monitor
+
+        return JsonRpcResponse(
+            id: id,
+            result: AnyCodable(["ok": true, "requiredTaps": requiredTaps, "tapInterval": tapInterval, "maxHoldDuration": maxHoldDuration]),
+            error: nil
+        )
+    }
+
+    private func handleStopModifierTapMonitor(id: String?) -> JsonRpcResponse {
+        modifierTapMonitor?.stop()
+        modifierTapMonitor = nil
+        return JsonRpcResponse(id: id, result: AnyCodable(["ok": true]), error: nil)
     }
 
     private func send(_ response: JsonRpcResponse) {

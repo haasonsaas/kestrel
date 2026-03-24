@@ -1,10 +1,13 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { v4 as uuid } from 'uuid'
 import { eq } from 'drizzle-orm'
+import path from 'path'
+import fs from 'fs'
 import { createMainWindow } from './windows/mainWindow'
 import { createOverlayPanel, toggleOverlay } from './windows/overlayPanel'
 import { createMeetingStatusPanel } from './windows/meetingStatus'
+import { createHummingbirdWindow, toggleHummingbird, hideHummingbird } from './windows/hummingbird'
 import { initDatabase, getDatabase, closeDatabase } from './db'
 import * as schema from './db/schema'
 import { registerIpcHandlers } from './ipc/handlers'
@@ -28,14 +31,19 @@ import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wi
 let mainWindow: BrowserWindow | null = null
 let overlayPanel: BrowserWindow | null = null
 let meetingStatusPanel: BrowserWindow | null = null
+let hummingbirdWindow: BrowserWindow | null = null
 let contextKit: ContextKitClient | null = null
+let tray: Tray | null = null
 const mcpManager = new MCPServerManager()
 
 // Meeting auto-detect state
 let meetingGraceTimer: ReturnType<typeof setTimeout> | null = null
 let lastSnapshotTime = 0
 
-app.whenReady().then(() => {
+// Voice recording state
+let voiceRecordingActive = false
+
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.kestrel.app')
 
@@ -65,12 +73,9 @@ app.whenReady().then(() => {
 
   // Context IPC handlers
   ipcMain.handle('context:get', async () => {
-    console.log('[ipc] context:get called, contextKit exists:', !!contextKit)
     if (!contextKit) return null
     try {
-      const result = await contextKit.getContext()
-      console.log('[ipc] context:get result:', result?.appName ?? 'null')
-      return result
+      return await contextKit.getContext()
     } catch (err) {
       console.error('[ipc] context:get error:', err)
       return null
@@ -78,12 +83,9 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('context:checkPermissions', async () => {
-    console.log('[ipc] context:checkPermissions called, contextKit exists:', !!contextKit)
     if (!contextKit) return { accessibility: false, screenRecording: false, microphone: false }
     try {
-      const result = await contextKit.checkPermissions()
-      console.log('[ipc] context:checkPermissions result:', JSON.stringify(result))
-      return result
+      return await contextKit.checkPermissions()
     } catch (err) {
       console.error('[ipc] context:checkPermissions error:', err)
       return { accessibility: false, screenRecording: false, microphone: false }
@@ -95,6 +97,10 @@ app.whenReady().then(() => {
   mcpManager.setMainWindow(mainWindow)
   overlayPanel = createOverlayPanel()
   meetingStatusPanel = createMeetingStatusPanel()
+  hummingbirdWindow = createHummingbirdWindow()
+
+  // ── System tray ──────────────────────────────────────
+  setupTray()
 
   // Event viewer IPC
   ipcMain.handle('events:snapshot', async (_e, windowMinutes?: number) => {
@@ -105,47 +111,38 @@ app.whenReady().then(() => {
     return getRecentEvents(limit ?? 50)
   })
 
-  // Register global shortcuts
-  const overlayShortcut = globalShortcut.register('CommandOrControl+Shift+Space', () => {
-    if (overlayPanel) toggleOverlay(overlayPanel)
+  // ── Modifier-tap shortcut (double-tap Option) ────────
+  setupModifierTapMonitor()
+
+  // ── Global keyboard shortcuts ────────────────────────
+
+  // Cmd+Shift+Space: Toggle overlay (legacy, kept as fallback)
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
   })
 
-  if (!overlayShortcut) {
-    console.warn('Failed to register overlay shortcut (Cmd+Shift+Space)')
-  }
-
   // Cmd+N: Create new chat thread and focus main window
-  const newChatShortcut = globalShortcut.register('CommandOrControl+N', () => {
+  globalShortcut.register('CommandOrControl+N', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show()
       mainWindow.focus()
       mainWindow.webContents.send('app:newChat', {})
     }
   })
-  if (!newChatShortcut) {
-    console.warn('Failed to register new chat shortcut (Cmd+N)')
-  }
 
   // Cmd+Shift+R: Toggle meeting recording
-  const toggleRecordingShortcut = globalShortcut.register('CommandOrControl+Shift+R', async () => {
+  globalShortcut.register('CommandOrControl+Shift+R', async () => {
     if (isRecording()) {
       const meetingId = getActiveMeetingId()
-      if (meetingId) {
-        await stopMeetingRecording(meetingId)
-        console.log('[shortcut] Stopped meeting recording')
-      }
+      if (meetingId) await stopMeetingRecording(meetingId)
     } else {
-      const id = await startMeetingRecording('Meeting', 'Manual Recording')
-      console.log('[shortcut] Started meeting recording:', id)
+      await startMeetingRecording('Meeting', 'Manual Recording')
     }
   })
-  if (!toggleRecordingShortcut) {
-    console.warn('Failed to register toggle recording shortcut (Cmd+Shift+R)')
-  }
 
-  // IPC: Window controls
+  // ── Window control IPC ───────────────────────────────
   ipcMain.handle('window:toggleOverlay', () => {
-    if (overlayPanel) toggleOverlay(overlayPanel)
+    if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
   })
 
   ipcMain.handle('window:minimize', () => {
@@ -154,144 +151,66 @@ app.whenReady().then(() => {
 
   ipcMain.handle('window:maximize', () => {
     const win = BrowserWindow.getFocusedWindow()
-    if (win?.isMaximized()) {
-      win.unmaximize()
-    } else {
-      win?.maximize()
-    }
+    if (win?.isMaximized()) win.unmaximize()
+    else win?.maximize()
   })
 
   ipcMain.handle('window:close', () => {
-    BrowserWindow.getFocusedWindow()?.close()
+    const win = BrowserWindow.getFocusedWindow()
+    // Hide hummingbird instead of closing
+    if (win === hummingbirdWindow) {
+      hideHummingbird(hummingbirdWindow)
+    } else {
+      win?.close()
+    }
   })
 
-  // Helper to read a setting from the DB
-  function getSetting(key: string): unknown {
-    try {
-      const db = getDatabase()
-      const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get()
-      return row ? JSON.parse(row.value) : null
-    } catch {
-      return null
-    }
-  }
-
-  // Helper to send IPC push events to all renderer windows
-  function sendToAllRenderers(channel: string, data: unknown): void {
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send(channel, data)
-      }
-    }
-  }
-
-  // Context polling + meeting auto-detection (every 5 seconds)
-  // Context snapshots are saved every 30 seconds (controlled by lastSnapshotTime)
+  // ── Context polling + meeting auto-detection ─────────
   let pollCount = 0
   setInterval(async () => {
     if (!contextKit) return
     try {
       const context = await contextKit.getContext()
-      if (!context) {
-        console.log('[auto-detect] context is null/undefined, skipping')
-        return
-      }
+      if (!context) return
 
-      // Log full context every 5th poll (every 25s) to avoid spam
       pollCount++
-      if (pollCount % 5 === 1) {
-        console.log(`[auto-detect] poll #${pollCount} — app=${context.appName} bundleId=${context.bundleId} url=${context.url ?? 'NONE'} windowTitle=${context.windowTitle?.slice(0, 60) ?? 'NONE'}`)
-      }
 
-      // ── Meeting auto-detection ──────────────────────────────
+      // ── Meeting auto-detection ──
       const autoDetect = getSetting('autoDetectMeetings')
-      // Default to TRUE if not explicitly set
       const autoDetectEnabled = autoDetect === null || autoDetect === undefined || autoDetect === true || autoDetect === 'true'
 
-      if (!autoDetectEnabled) {
-        if (pollCount % 5 === 1) {
-          console.log(`[auto-detect] DISABLED — autoDetect setting raw value: ${JSON.stringify(autoDetect)} (type: ${typeof autoDetect})`)
-        }
-      }
-
       if (autoDetectEnabled) {
-        // PRIMARY: CoreAudio mic activity detection — works even when meeting
-        // app is NOT the frontmost window. Checks which processes are actively
-        // using the microphone input.
         const micDetection = await contextKit.detectMeetingByMic()
-
-        // SECONDARY: Frontmost app + URL detection (supplements mic detection)
-        const frontDetection = detectMeeting(
-          context.bundleId,
-          context.url,
-          context.windowTitle
-        )
-
+        const frontDetection = detectMeeting(context.bundleId, context.url, context.windowTitle)
         const detected = micDetection.meetingDetected || frontDetection.detected
         const meetingApp = micDetection.meetingApp || frontDetection.app || 'Meeting'
         const meetingTitle = frontDetection.title || micDetection.meetingApp || 'Meeting'
 
-        if (pollCount % 5 === 1) {
-          console.log(`[auto-detect] mic: detected=${micDetection.meetingDetected} app=${micDetection.meetingApp ?? 'none'} users=[${micDetection.micUsers.map(u => u.bundleId).join(',')}]`)
-          console.log(`[auto-detect] front: detected=${frontDetection.detected} app="${frontDetection.app}" | combined=${detected} | isRecording=${isRecording()}`)
-        }
-
         if (detected && !isRecording()) {
-          const detectEvent = WideEvent.start('meeting_autodetect', {
-            meeting_app: meetingApp,
-            meeting_title: meetingTitle,
-            detection_source: micDetection.meetingDetected ? 'mic_activity' : 'frontmost_app',
-            mic_users: micDetection.micUsers.map(u => u.bundleId).join(','),
-            source_bundle: context.bundleId,
-            source_url: context.url ?? null
-          })
-          console.log(`[auto-detect] MEETING DETECTED: ${meetingApp} — ${meetingTitle} (via ${micDetection.meetingDetected ? 'mic activity' : 'frontmost app'})`)
           const meetingId = await startMeetingRecording(meetingTitle, meetingApp)
-          detectEvent.set('meeting_id', meetingId)
-          detectEvent.finish()
-          sendToAllRenderers('meeting:detected', {
-            app: meetingApp,
-            title: meetingTitle,
-            meetingId
-          })
-
-          if (meetingGraceTimer) {
-            clearTimeout(meetingGraceTimer)
-            meetingGraceTimer = null
-          }
+          sendToAllRenderers('meeting:detected', { app: meetingApp, title: meetingTitle, meetingId })
+          if (meetingGraceTimer) { clearTimeout(meetingGraceTimer); meetingGraceTimer = null }
         } else if (!detected && isRecording() && getActiveMeetingId()) {
-          // No meeting signal — start grace period before auto-stopping
           if (!meetingGraceTimer) {
-            console.log('[auto-detect] No meeting signal, starting 30s grace period')
             const meetingId = getActiveMeetingId()!
             meetingGraceTimer = setTimeout(async () => {
               if (isRecording() && getActiveMeetingId() === meetingId) {
-                // Final recheck using mic activity
                 const finalCheck = await contextKit!.detectMeetingByMic()
                 if (!finalCheck.meetingDetected) {
-                  console.log('[auto-detect] Grace period expired, auto-stopping')
                   await stopMeetingRecording(meetingId)
-                  sendToAllRenderers('meeting:autoStopped', {
-                    meetingId,
-                    reason: 'No meeting audio detected'
-                  })
-                  WideEvent.emit('meeting_stop', { meeting_id: meetingId, reason: 'auto_grace_expired' })
-                } else {
-                  console.log('[auto-detect] Meeting mic still active during grace, continuing')
+                  sendToAllRenderers('meeting:autoStopped', { meetingId, reason: 'No meeting audio detected' })
                 }
               }
               meetingGraceTimer = null
             }, 30000)
           }
         } else if (detected && isRecording() && meetingGraceTimer) {
-          // Meeting is back — cancel the grace timer
-          console.log('[auto-detect] Meeting re-detected, cancelling grace timer')
           clearTimeout(meetingGraceTimer)
           meetingGraceTimer = null
         }
       }
 
-      // ── Context snapshots (every 30 seconds) ───────────────
+      // ── Context snapshots (every 30s) ──
       const now = Date.now()
       if (now - lastSnapshotTime >= 30000) {
         lastSnapshotTime = now
@@ -314,7 +233,6 @@ app.whenReady().then(() => {
   }, 5000)
 
   // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl+R in production
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -338,5 +256,224 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll()
   contextKit?.shutdown()
   mcpManager.stopAll()
+  tray?.destroy()
   closeDatabase()
 })
+
+// ── Helper functions ─────────────────────────────────────
+
+function getSetting(key: string): unknown {
+  try {
+    const db = getDatabase()
+    const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get()
+    return row ? JSON.parse(row.value) : null
+  } catch {
+    return null
+  }
+}
+
+function sendToAllRenderers(channel: string, data: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, data)
+    }
+  }
+}
+
+// ── Modifier-tap monitor setup ───────────────────────────
+
+function setupModifierTapMonitor(): void {
+  if (!contextKit) return
+
+  // Listen for modifier events from ContextKit
+  contextKit.on('modifierTap', () => {
+    console.log('[modifier] Double-tap Option detected — toggling hummingbird')
+    if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
+  })
+
+  contextKit.on('modifierHoldStarted', () => {
+    console.log('[modifier] Option hold started — voice mode')
+    if (hummingbirdWindow) {
+      toggleHummingbird(hummingbirdWindow, true)
+      startVoiceRecording()
+    }
+  })
+
+  contextKit.on('modifierHoldReleased', () => {
+    console.log('[modifier] Option hold released — stopping voice')
+    stopVoiceRecording()
+  })
+
+  // Configure the monitor
+  contextKit.configureModifierTapMonitor({
+    modifier: 'option',
+    requiredTaps: 2,
+    tapInterval: 0.4,
+    maxHoldDuration: 0.3
+  }).catch((err) => {
+    console.warn('[modifier] Failed to configure tap monitor:', err.message)
+  })
+}
+
+// ── Voice recording ──────────────────────────────────────
+
+async function startVoiceRecording(): Promise<void> {
+  if (!contextKit || voiceRecordingActive) return
+  voiceRecordingActive = true
+
+  try {
+    await contextKit.startRecording()
+    sendToAllRenderers('hummingbird:voiceRecording', { recording: true })
+    console.log('[voice] Recording started')
+  } catch (err) {
+    console.error('[voice] Failed to start recording:', err)
+    voiceRecordingActive = false
+    sendToAllRenderers('hummingbird:voiceRecording', { recording: false })
+  }
+}
+
+async function stopVoiceRecording(): Promise<void> {
+  if (!contextKit || !voiceRecordingActive) return
+  voiceRecordingActive = false
+
+  try {
+    const result = await contextKit.stopRecording()
+    sendToAllRenderers('hummingbird:voiceRecording', { recording: false })
+    console.log(`[voice] Recording stopped — ${result.durationSeconds}s`)
+
+    // Transcribe via Whisper
+    const audioPath = result.combinedAudioPath || result.micAudioPath
+    if (audioPath && result.durationSeconds > 0.5) {
+      const transcript = await transcribeAudio(audioPath)
+      if (transcript) {
+        console.log(`[voice] Transcript: "${transcript.slice(0, 80)}"`)
+        sendToAllRenderers('hummingbird:voiceTranscript', { text: transcript })
+      }
+    }
+  } catch (err) {
+    console.error('[voice] Failed to stop recording:', err)
+    sendToAllRenderers('hummingbird:voiceRecording', { recording: false })
+  }
+}
+
+async function transcribeAudio(audioPath: string): Promise<string | null> {
+  // Get OpenAI API key from settings
+  const apiKey = getSetting('openai_api_key') as string | null
+  if (!apiKey) {
+    console.warn('[voice] No OpenAI API key set — cannot transcribe')
+    return null
+  }
+
+  try {
+    const audioData = fs.readFileSync(audioPath)
+    const formData = new FormData()
+    formData.append('file', new Blob([audioData], { type: 'audio/wav' }), 'recording.wav')
+    formData.append('model', 'whisper-1')
+    formData.append('response_format', 'text')
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      console.error('[voice] Whisper API error:', response.status, await response.text())
+      return null
+    }
+
+    const text = await response.text()
+    return text.trim()
+  } catch (err) {
+    console.error('[voice] Transcription failed:', err)
+    return null
+  }
+}
+
+// ── System tray ──────────────────────────────────────────
+
+function setupTray(): void {
+  // Create a small template icon for the menu bar
+  // Using a 16x16 template image (macOS auto-handles dark/light)
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'tray-icon.png')
+    : path.join(app.getAppPath(), 'resources', 'tray-icon.png')
+
+  let icon: Electron.NativeImage
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath)
+    icon.setTemplateImage(true)
+  } else {
+    // Fallback: create a tiny bird-like icon programmatically
+    icon = nativeImage.createEmpty()
+  }
+
+  tray = new Tray(icon)
+  tray.setToolTip('Kestrel')
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show Kestrel',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      }
+    },
+    {
+      label: 'Quick Chat',
+      accelerator: 'Option+Option',
+      click: () => {
+        if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'New Chat',
+      accelerator: 'CmdOrCtrl+N',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+          mainWindow.webContents.send('app:newChat', {})
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Hide Dock Icon',
+      type: 'checkbox',
+      checked: false,
+      click: (menuItem) => {
+        if (menuItem.checked) {
+          app.dock?.hide()
+        } else {
+          app.dock?.show()
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Kestrel',
+      accelerator: 'CmdOrCtrl+Q',
+      click: () => app.quit()
+    }
+  ])
+
+  tray.setContextMenu(contextMenu)
+
+  // Click tray icon → toggle main window
+  tray.on('click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    }
+  })
+}

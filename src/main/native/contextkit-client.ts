@@ -3,6 +3,7 @@ import * as readline from 'readline'
 import path from 'path'
 import fs from 'fs'
 import { app } from 'electron'
+import { EventEmitter } from 'events'
 import type { AppContext, PermissionStatus } from '../../shared/ipc'
 import type { ContextTreeResult } from '../parsers/types'
 
@@ -20,7 +21,9 @@ interface FrontmostAppInfo {
   windowTitle?: string
 }
 
-export class ContextKitClient {
+export type ModifierEvent = 'modifierTap' | 'modifierHoldStarted' | 'modifierHoldReleased'
+
+export class ContextKitClient extends EventEmitter {
   private process: ChildProcess | null = null
   private rl: readline.Interface | null = null
   private pending = new Map<
@@ -36,6 +39,7 @@ export class ContextKitClient {
   private binaryPath: string
 
   constructor() {
+    super()
     // Try multiple paths to find the binary
     const candidates = [
       // Production: inside app bundle Resources
@@ -120,7 +124,16 @@ export class ContextKitClient {
     this.rl.on('line', (line) => {
       try {
         const msg: JsonRpcResponse = JSON.parse(line)
-        if (!msg.id) return // skip notifications
+        if (!msg.id) {
+          // Handle notifications (modifier tap events, etc.)
+          const result = msg.result as Record<string, unknown> | undefined
+          if (result?.type) {
+            const eventType = result.type as string
+            console.log(`[contextkit] notification: ${eventType}`)
+            this.emit(eventType, result)
+          }
+          return
+        }
         const p = this.pending.get(msg.id)
         if (!p) return
         this.pending.delete(msg.id)
@@ -284,6 +297,28 @@ export class ContextKitClient {
       recording: boolean
       durationSeconds: number
     }
+  }
+
+  // ── Modifier Tap Monitor ─────────────────────────
+
+  async configureModifierTapMonitor(opts?: {
+    modifier?: string
+    requiredTaps?: number
+    tapInterval?: number
+    maxHoldDuration?: number
+  }): Promise<void> {
+    await this.call('configureModifierTapMonitor', {
+      modifier: opts?.modifier ?? 'option',
+      requiredTaps: opts?.requiredTaps ?? 2,
+      tapInterval: opts?.tapInterval ?? 0.4,
+      maxHoldDuration: opts?.maxHoldDuration ?? 0.3
+    })
+    console.log('[contextkit] Modifier tap monitor configured')
+  }
+
+  async stopModifierTapMonitor(): Promise<void> {
+    await this.call('stopModifierTapMonitor')
+    console.log('[contextkit] Modifier tap monitor stopped')
   }
 
   async shutdown(): Promise<void> {
