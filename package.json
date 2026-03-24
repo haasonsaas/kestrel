@@ -18,6 +18,7 @@
     "test": "node tests/contextkit-pipeline.test.mjs && node tests/meeting-detection.test.mjs && node tests/audio-data-size.test.mjs"
   },
   "dependencies": {
+    "@ax-llm/ax": "^19.0.33",
     "@electron-toolkit/utils": "^4.0.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@radix-ui/react-dialog": "^1.1.4",
@@ -82,11 +83,15 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "icon": "resources/icon.icns",
