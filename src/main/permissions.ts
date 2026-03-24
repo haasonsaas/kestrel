@@ -63,8 +63,17 @@ async function checkAllPermissions(): Promise<PermissionState> {
     try {
       const result = await contextKitRef.checkPermissions()
       accessibility = result.accessibility
-    } catch {
-      accessibility = false
+      console.log(`[permissions] ContextKit accessibility: ${accessibility}`)
+    } catch (err) {
+      console.error(`[permissions] ContextKit checkPermissions failed:`, err)
+      // Fallback: if we can get context, accessibility works
+      try {
+        const ctx = await contextKitRef.getContext()
+        if (ctx && ctx.appName) {
+          accessibility = true
+          console.log(`[permissions] Fallback: getContext returned ${ctx.appName}, marking accessible`)
+        }
+      } catch { /* truly unavailable */ }
     }
   }
 

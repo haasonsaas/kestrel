@@ -232,8 +232,12 @@ Screen context follows.`
     prompt += `\n\nThe user's current screen context is:\n${contextResult.block}`
 
     if (!contextResult.hasVisibleText) {
-      // We can see the app name but not the screen content — accessibility not granted
-      prompt += `\n\nIMPORTANT: You can only see the app name (${contextResult.appName}), NOT the screen content. Accessibility permission is missing. When the user asks what you see or what's on their screen, you MUST tell them:\n\n"I can see you're using ${contextResult.appName}, but I can't read the screen content yet. To enable this, go to **System Settings → Privacy & Security → Accessibility** and toggle on **Kestrel**. Then restart Kestrel. After that, I'll be able to read what's on your screen and help with your current task."\n\nDo NOT say you can help if they paste content. Lead with the fix.`
+      // No visible text — could be:
+      // 1. Kestrel is frontmost (cached context has app name but no text) — normal
+      // 2. Accessibility not granted — real issue
+      // Don't show the accessibility hint if we have an app name — it's likely just
+      // Kestrel being frontmost. The user will switch apps and context will populate.
+      prompt += `\n\nNote: Screen text is not available right now (the user may have just switched to Kestrel). You can see the app name "${contextResult.appName}" but not the screen content. If the user asks what's on their screen and you only have the app name, say you can see they were using ${contextResult.appName} and ask them to switch back to that app briefly so you can read the content. If this persists across multiple messages, suggest checking System Settings → Privacy & Security → Accessibility.`
     }
   } else {
     // No context at all — ContextKit may not be running
