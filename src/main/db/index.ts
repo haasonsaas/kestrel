@@ -26,7 +26,7 @@ export function initDatabase(): typeof db {
     CREATE TABLE IF NOT EXISTS threads (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT 'New Chat',
-      model TEXT NOT NULL DEFAULT 'anthropic/claude-sonnet-4.6',
+      model TEXT NOT NULL DEFAULT 'openai/gpt-5.4', -- See shared/config.ts DEFAULT_MODEL
       starred INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

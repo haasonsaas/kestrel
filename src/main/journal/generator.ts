@@ -1,6 +1,7 @@
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { chatCompletion } from '../ai/openrouter'
+import { INTERNAL_MODEL } from '../../shared/config'
 
 export async function generateJournal(date: string): Promise<{
   title: string
@@ -63,7 +64,7 @@ Format as JSON:
 
   const response = await chatCompletion(
     [{ role: 'user', content: prompt }],
-    'anthropic/claude-sonnet-4.6'
+    INTERNAL_MODEL
   )
 
   try {

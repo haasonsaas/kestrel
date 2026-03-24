@@ -219,12 +219,13 @@ function buildToolCallsArray(
 
 // Frontier models available on OpenRouter (March 2026)
 export const AVAILABLE_MODELS = [
-  // Anthropic
-  { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', provider: 'Anthropic', contextWindow: 1000000 },
-  { id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic', contextWindow: 1000000 },
-  // OpenAI
-  { id: 'openai/gpt-5.4-pro', name: 'GPT-5.4 Pro', provider: 'OpenAI', contextWindow: 1050000 },
+  // OpenAI (default model first — see shared/config.ts)
   { id: 'openai/gpt-5.4', name: 'GPT-5.4', provider: 'OpenAI', contextWindow: 1050000 },
+  { id: 'openai/gpt-5.4-pro', name: 'GPT-5.4 Pro', provider: 'OpenAI', contextWindow: 1050000 },
+  // Anthropic
+  { id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic', contextWindow: 1000000 },
+  { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', provider: 'Anthropic', contextWindow: 1000000 },
+  // OpenAI (older)
   { id: 'openai/gpt-5.2-pro', name: 'GPT-5.2 Pro', provider: 'OpenAI', contextWindow: 400000 },
   { id: 'openai/gpt-5.2', name: 'GPT-5.2', provider: 'OpenAI', contextWindow: 400000 },
   // Google

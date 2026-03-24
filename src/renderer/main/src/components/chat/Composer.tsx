@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite'
 import { chatStore } from '@/stores/chatStore'
 import { cn } from '@/lib/utils'
 import { Send, ChevronDown, Bird, Eye, EyeOff } from 'lucide-react'
+import { DEFAULT_MODEL } from '../../../../../shared/config'
 
 export const Composer = observer(function Composer() {
   const [input, setInput] = useState('')
@@ -105,7 +106,7 @@ export const Composer = observer(function Composer() {
 const ModelSelector = observer(function ModelSelector() {
   const [open, setOpen] = useState(false)
   const thread = chatStore.activeThread
-  const currentModel = thread?.model || 'anthropic/claude-sonnet-4.6'
+  const currentModel = thread?.model || DEFAULT_MODEL
   const model = chatStore.models.find((m) => m.id === currentModel)
 
   return (

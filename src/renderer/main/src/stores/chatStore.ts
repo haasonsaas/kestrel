@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import type { Thread, Message, AIModel, AppContext } from '../../../../shared/ipc'
+import { DEFAULT_MODEL } from '../../../../shared/config'
 
 interface ActiveToolCall {
   toolName: string
@@ -253,7 +254,7 @@ class ChatStore {
 
     const threadId = this.activeThreadId
     const thread = this.threads.find(t => t.id === threadId)
-    const selectedModel = model || thread?.model || 'anthropic/claude-sonnet-4.6'
+    const selectedModel = model || thread?.model || DEFAULT_MODEL
 
     // Save user message
     const userMessage = await window.api.invoke('messages:create', {

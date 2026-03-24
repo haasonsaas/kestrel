@@ -3,7 +3,7 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 export const threads = sqliteTable('threads', {
   id: text('id').primaryKey(),
   title: text('title').notNull().default('New Chat'),
-  model: text('model').notNull().default('anthropic/claude-sonnet-4.6'),
+  model: text('model').notNull().default('openai/gpt-5.4'), // See shared/config.ts DEFAULT_MODEL
   starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()

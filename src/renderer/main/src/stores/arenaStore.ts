@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import type { AIModel } from '../../../../shared/ipc'
+import { ARENA_DEFAULT_MODELS } from '../../../../shared/config'
 
 interface ArenaResponse {
   model: string
@@ -20,10 +21,7 @@ interface ArenaSession {
 class ArenaStore {
   sessions: ArenaSession[] = []
   activeSession: ArenaSession | null = null
-  selectedModels: string[] = [
-    'anthropic/claude-sonnet-4.6',
-    'openai/gpt-5.4'
-  ]
+  selectedModels: string[] = [...ARENA_DEFAULT_MODELS]
   availableModels: AIModel[] = []
   isRunning = false
 

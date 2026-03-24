@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, Bird, Sparkles, Loader2 } from 'lucide-react'
 import '../../main/src/styles/globals.css'
+import { DEFAULT_MODEL } from '../../../shared/config'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -13,8 +14,8 @@ function OverlayApp() {
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [threadId, setThreadId] = useState<string | null>(null)
-  const [model, setModel] = useState('anthropic/claude-sonnet-4.6')
-  const [modelDisplayName, setModelDisplayName] = useState('Claude Sonnet 4.6')
+  const [model, setModel] = useState(DEFAULT_MODEL)
+  const [modelDisplayName, setModelDisplayName] = useState('GPT-5.4')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Load model from settings on mount
@@ -30,7 +31,7 @@ function OverlayApp() {
         }
         // Also try to get the proper display name from models list
         const models = await window.api.invoke('ai:models')
-        const currentModel = savedModel && typeof savedModel === 'string' ? savedModel : 'anthropic/claude-sonnet-4.6'
+        const currentModel = savedModel && typeof savedModel === 'string' ? savedModel : DEFAULT_MODEL
         const found = models.find((m: { id: string; name: string }) => m.id === currentModel)
         if (found) {
           setModelDisplayName(found.name)

@@ -1,4 +1,5 @@
 import { chatCompletion } from '../ai/openrouter'
+import { INTERNAL_MODEL } from '../../shared/config'
 
 export async function summarizeMeeting(
   transcript: string,
@@ -22,7 +23,7 @@ ${transcript.slice(0, 50000)}`
 
   const response = await chatCompletion(
     [{ role: 'user', content: prompt }],
-    'anthropic/claude-sonnet-4.6'
+    INTERNAL_MODEL
   )
 
   try {

@@ -10,6 +10,7 @@ import type {
   PrivacyRule, CreatePrivacyRule,
   ContextSnapshot
 } from '../../shared/ipc'
+import { DEFAULT_MODEL } from '../../shared/config'
 
 export function registerIpcHandlers(): void {
   const db = getDatabase()
@@ -48,7 +49,7 @@ export function registerIpcHandlers(): void {
     const thread = {
       id: uuid(),
       title: title || 'New Chat',
-      model: 'anthropic/claude-sonnet-4.6',
+      model: DEFAULT_MODEL,
       starred: false,
       createdAt: new Date(now),
       updatedAt: new Date(now)
