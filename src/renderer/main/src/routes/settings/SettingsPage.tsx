@@ -8,16 +8,21 @@ import {
   Keyboard,
   Monitor,
   Palette,
-  Activity
+  Activity,
+  Lock,
+  Check,
+  ExternalLink,
+  Mic
 } from 'lucide-react'
 import { PrivacyControls } from '@/components/settings/PrivacyControls'
 import { MCPServers } from '@/components/settings/MCPServers'
 import { APIKeySettings as APIKeySettingsComponent } from '@/components/settings/APIKeySettings'
 
-type SettingsTab = 'general' | 'appearance' | 'privacy' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
+type SettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Settings }> = [
   { id: 'general', label: 'General', icon: Settings },
+  { id: 'permissions', label: 'Permissions', icon: Lock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'privacy', label: 'Privacy Controls', icon: Shield },
   { id: 'apikeys', label: 'API Keys', icon: Key },
@@ -71,6 +76,8 @@ function SettingsContent({ tab }: { tab: SettingsTab }) {
   switch (tab) {
     case 'general':
       return <GeneralSettings />
+    case 'permissions':
+      return <PermissionsSettings />
     case 'appearance':
       return <AppearanceSettings />
     case 'privacy':
@@ -437,6 +444,122 @@ function StatCard({ label, value, warn }: { label: string; value: string | numbe
     )}>
       <p className="text-[11px] text-muted-foreground mb-1">{label}</p>
       <p className={cn('text-lg font-semibold font-mono', warn && 'text-destructive')}>{value}</p>
+    </div>
+  )
+}
+
+function PermissionsSettings() {
+  const [perms, setPerms] = useState<{ accessibility: boolean; microphone: boolean; screenRecording: boolean } | null>(null)
+
+  const check = useCallback(async () => {
+    const result = await window.api.invoke('permissions:check')
+    setPerms(result)
+  }, [])
+
+  useEffect(() => {
+    check()
+    const timer = setInterval(check, 2000)
+    return () => clearInterval(timer)
+  }, [check])
+
+  const openSettings = useCallback(async (pane: string) => {
+    await window.api.invoke('permissions:openSettings', pane)
+  }, [])
+
+  const requestMic = useCallback(async () => {
+    await window.api.invoke('permissions:request', 'microphone')
+    check()
+  }, [check])
+
+  if (!perms) return null
+
+  const allGood = perms.accessibility && perms.microphone
+
+  return (
+    <div>
+      <h3 className="text-xl font-semibold mb-2">Permissions</h3>
+      <p className="text-sm text-muted-foreground mb-6">
+        Kestrel needs macOS permissions to read your screen and record meetings.
+      </p>
+
+      {allGood && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-green-500/20 bg-green-500/5 mb-6">
+          <Check className="h-5 w-5 text-green-600" />
+          <span className="text-sm font-medium text-green-700 dark:text-green-400">All required permissions granted</span>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <PermRow
+          icon={Shield}
+          name="Accessibility"
+          desc="Read window titles, text content, and UI elements from apps"
+          granted={perms.accessibility}
+          required
+          onEnable={() => openSettings('accessibility')}
+        />
+        <PermRow
+          icon={Mic}
+          name="Microphone"
+          desc="Record your voice during meetings for transcription"
+          granted={perms.microphone}
+          required
+          onEnable={requestMic}
+        />
+        <PermRow
+          icon={Monitor}
+          name="Screen & System Audio"
+          desc="Capture system audio from other participants during meetings"
+          granted={perms.screenRecording}
+          onEnable={() => openSettings('screenRecording')}
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-6">
+        Permissions update in real time. After toggling in System Settings, the status above refreshes automatically.
+        {!perms.accessibility && ' You may need to restart Kestrel after enabling Accessibility.'}
+      </p>
+    </div>
+  )
+}
+
+function PermRow({ icon: Icon, name, desc, granted, required, onEnable }: {
+  icon: typeof Shield; name: string; desc: string
+  granted: boolean; required?: boolean; onEnable: () => void
+}) {
+  return (
+    <div className={cn(
+      'flex items-center gap-4 p-4 rounded-2xl border transition-colors',
+      granted ? 'border-green-500/20 bg-green-500/5' : 'border-border bg-card'
+    )}>
+      <div className={cn(
+        'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+        granted ? 'bg-green-500/10' : 'bg-muted'
+      )}>
+        {granted
+          ? <Check className="h-5 w-5 text-green-600" />
+          : <Icon className="h-5 w-5 text-muted-foreground" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">{name}</p>
+          {required && !granted && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-warm/10 text-warm font-medium">Required</span>
+          )}
+          {!required && !granted && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Optional</span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+      </div>
+      {!granted ? (
+        <button onClick={onEnable} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground text-background hover:opacity-90 transition-all shrink-0">
+          Enable <ExternalLink className="h-3 w-3" />
+        </button>
+      ) : (
+        <span className="text-xs text-green-600 font-medium shrink-0">Granted</span>
+      )}
     </div>
   )
 }
