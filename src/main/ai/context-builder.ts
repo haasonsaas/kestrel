@@ -50,17 +50,10 @@ export async function buildContextPrompt(
   }
 
   if (context.visibleText && context.visibleText.length > 0) {
-    // Limit to ~4000 chars of visible text to avoid bloating the prompt
-    let textBudget = 4000
-    const selectedTexts: string[] = []
-    for (const text of context.visibleText) {
-      if (textBudget <= 0) break
-      // Truncate individual items that are too long
-      const truncated = text.length > 2000 ? text.slice(0, 2000) + '...[truncated]' : text
-      selectedTexts.push(truncated)
-      textBudget -= truncated.length
+    const extracted = extractSemanticContent(context.visibleText.join('\n'), context.appName)
+    if (extracted.length > 0) {
+      parts.push(`\nVisible content:\n${extracted}`)
     }
-    parts.push(`\nVisible content:\n${selectedTexts.join('\n')}`)
   }
 
   const hasVisibleText = (context.visibleText?.length ?? 0) > 0
@@ -138,6 +131,75 @@ export function parseToolName(combinedName: string): { serverName: string; toolN
  */
 function sanitizeToolName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
+/**
+ * Extract semantically meaningful content from raw screen text.
+ * Uses pattern matching to pull out high-signal lines (errors, commands,
+ * filenames, URLs, names) and falls back to a sliding window (first 500
+ * chars + last 1500 chars) for unstructured content.
+ */
+function extractSemanticContent(rawText: string, appName: string): string {
+  const MAX_OUTPUT = 3000
+  const lines = rawText.split('\n')
+
+  // High-signal patterns — lines matching these are always kept
+  const signalPatterns = [
+    /error|Error|ERROR|ERR:|fatal|FATAL|panic/i,           // Errors
+    /warning|WARN/i,                                        // Warnings
+    /^\s*(at |Traceback|File "|  \d+ \|)/,                 // Stack traces
+    /\.(ts|tsx|js|jsx|py|rb|go|rs|swift|java):\d+/,       // File:line references
+    /https?:\/\/\S+/,                                      // URLs
+    /^\s*[+\-!>]\s/,                                       // Diff lines
+    /^\$\s|^>\s|^\w+@|^root@/,                            // Shell prompts + commands
+    /FAIL|PASS|✓|✗|█|──/,                                 // Test results
+    /^\s*(import |from |require|const |let |var |func |def |class )/,  // Code definitions
+    /→|@\w+:|#\w+/,                                        // Slack/chat: @mentions, #channels
+    /PR\s*#\d+|pull request|merge|commit/i,                // Git/PR references
+    /^\s*\d+\.\s|^\s*[-*]\s/,                             // Lists
+  ]
+
+  // Extract high-signal lines
+  const signalLines: string[] = []
+  const seenLines = new Set<string>()
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.length < 3) continue
+    if (seenLines.has(trimmed)) continue
+
+    if (signalPatterns.some(p => p.test(trimmed))) {
+      seenLines.add(trimmed)
+      signalLines.push(trimmed)
+    }
+  }
+
+  let output = ''
+
+  if (signalLines.length > 0) {
+    // Semantic extraction succeeded — use signal lines
+    output = signalLines.join('\n')
+    if (output.length > MAX_OUTPUT) {
+      output = output.slice(0, MAX_OUTPUT) + '\n...[truncated]'
+    }
+  }
+
+  // If semantic extraction got very little, add sliding window
+  if (output.length < 500 && rawText.length > 500) {
+    const head = rawText.slice(0, 500)
+    const tail = rawText.slice(-Math.min(2000, MAX_OUTPUT - 500))
+    const window = head + '\n...[' + rawText.length + ' chars total]...\n' + tail
+    output = output.length > 0
+      ? output + '\n\n[Additional context via sliding window]:\n' + window.slice(0, MAX_OUTPUT - output.length)
+      : window.slice(0, MAX_OUTPUT)
+  }
+
+  // If text is short enough, just use it directly
+  if (rawText.length <= MAX_OUTPUT && output.length === 0) {
+    output = rawText
+  }
+
+  return output
 }
 
 /**
