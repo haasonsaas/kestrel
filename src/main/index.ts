@@ -61,7 +61,7 @@ app.whenReady().then(() => {
   registerMeetingHandlers(contextKit)
   registerJournalHandlers()
   registerMCPHandlers(mcpManager)
-  registerPermissionHandlers(contextKit)
+  registerPermissionHandlers()
 
   // Context IPC handlers
   ipcMain.handle('context:get', async () => {

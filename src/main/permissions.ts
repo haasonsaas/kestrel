@@ -1,9 +1,12 @@
 /**
  * Permission checker for macOS system permissions.
- * Checks Accessibility, Microphone, and Screen Recording status.
+ *
+ * Key insight: check Accessibility from the Electron MAIN PROCESS using
+ * systemPreferences.isTrustedAccessibilityClient() — NOT from the child
+ * Swift binary. TCC grants permission to the app bundle, and this API
+ * checks the app bundle's trust status directly.
  */
-import { systemPreferences, ipcMain } from 'electron'
-import type { ContextKitClient } from './native/contextkit-client'
+import { systemPreferences, ipcMain, shell } from 'electron'
 
 export interface PermissionState {
   accessibility: boolean
@@ -12,11 +15,7 @@ export interface PermissionState {
   allGranted: boolean
 }
 
-let contextKitRef: ContextKitClient | null = null
-
-export function registerPermissionHandlers(contextKit: ContextKitClient | null): void {
-  contextKitRef = contextKit
-
+export function registerPermissionHandlers(): void {
   ipcMain.handle('permissions:check', async (): Promise<PermissionState> => {
     return checkAllPermissions()
   })
@@ -26,13 +25,12 @@ export function registerPermissionHandlers(contextKit: ContextKitClient | null):
       case 'microphone':
         return await systemPreferences.askForMediaAccess('microphone')
       case 'accessibility':
-        // Can't request programmatically — open System Settings
-        const { shell } = await import('electron')
+        // Prompt macOS to show the accessibility dialog, then open Settings
+        systemPreferences.isTrustedAccessibilityClient(true)
         shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')
         return false
       case 'screenRecording':
-        const { shell: s } = await import('electron')
-        s.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
         return false
       default:
         return false
@@ -40,7 +38,6 @@ export function registerPermissionHandlers(contextKit: ContextKitClient | null):
   })
 
   ipcMain.handle('permissions:openSettings', async (_e, pane?: string) => {
-    const { shell } = await import('electron')
     const panes: Record<string, string> = {
       accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
       microphone: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
@@ -50,32 +47,18 @@ export function registerPermissionHandlers(contextKit: ContextKitClient | null):
   })
 }
 
-async function checkAllPermissions(): Promise<PermissionState> {
+function checkAllPermissions(): PermissionState {
+  // Accessibility — checked from Electron main process directly
+  // This checks the APP BUNDLE's TCC trust, not the child binary's
+  const accessibility = systemPreferences.isTrustedAccessibilityClient(false)
+
   // Microphone
   const microphone = systemPreferences.getMediaAccessStatus('microphone') === 'granted'
 
   // Screen Recording
   const screenRecording = systemPreferences.getMediaAccessStatus('screen') === 'granted'
 
-  // Accessibility — check via ContextKit
-  let accessibility = false
-  if (contextKitRef) {
-    try {
-      const result = await contextKitRef.checkPermissions()
-      accessibility = result.accessibility
-      console.log(`[permissions] ContextKit accessibility: ${accessibility}`)
-    } catch (err) {
-      console.error(`[permissions] ContextKit checkPermissions failed:`, err)
-      // Fallback: if we can get context, accessibility works
-      try {
-        const ctx = await contextKitRef.getContext()
-        if (ctx && ctx.appName) {
-          accessibility = true
-          console.log(`[permissions] Fallback: getContext returned ${ctx.appName}, marking accessible`)
-        }
-      } catch { /* truly unavailable */ }
-    }
-  }
+  console.log(`[permissions] accessibility=${accessibility} microphone=${microphone} screen=${screenRecording}`)
 
   return {
     accessibility,
