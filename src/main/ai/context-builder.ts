@@ -1,5 +1,8 @@
 import { ContextKitClient } from '../native/contextkit-client'
 import { shouldExcludeContext } from '../privacy/rules'
+import { parseContext } from '../parsers'
+import type { ParsedContext, ParsedConversation, ParsedMessage } from '../parsers/types'
+import { USER } from '../parsers/types'
 import type { AppContext, MCPTool } from '../../shared/ipc'
 import type { OpenAITool } from './openrouter'
 
@@ -11,18 +14,48 @@ export interface ContextPromptResult {
 
 /**
  * Builds a system prompt section from the current app context.
- * Returns null if context is unavailable or excluded by privacy rules.
+ * Uses structured per-app parsers when available, falls back to flat text.
  */
 export async function buildContextPrompt(
   contextKit: ContextKitClient | null
 ): Promise<ContextPromptResult | null> {
   if (!contextKit) return null
 
-  let context: AppContext | null
+  // Try getContextTree first (includes AX tree for supported apps)
+  let context: AppContext | null = null
+  let parsed: ParsedContext | null = null
+
   try {
-    context = await contextKit.getContext()
+    const treeResult = await contextKit.getContextTree()
+    if (treeResult) {
+      context = {
+        appName: treeResult.appName,
+        bundleId: treeResult.bundleId,
+        windowTitle: treeResult.windowTitle,
+        url: treeResult.url,
+        pageTitle: treeResult.pageTitle,
+        visibleText: treeResult.visibleText
+      }
+      // Try per-app parser
+      parsed = parseContext(treeResult)
+      if (parsed) {
+        console.log(
+          `[context-builder] Parsed structured context: ${context.appName} — ` +
+            `${parsed.activeConversations?.length ?? 0} conversations, ` +
+            `${parsed.tasks?.length ?? 0} tasks`
+        )
+      }
+    }
   } catch {
-    return null
+    // Fall back to basic getContext
+  }
+
+  if (!context) {
+    try {
+      context = await contextKit.getContext()
+    } catch {
+      return null
+    }
   }
 
   if (!context) return null
@@ -49,16 +82,23 @@ export async function buildContextPrompt(
     parts.push(`Page: ${context.pageTitle}`)
   }
 
-  if (context.visibleText && context.visibleText.length > 0) {
+  // Use structured parsed context if available, otherwise fall back to flat text
+  if (parsed) {
+    const structured = formatParsedContext(parsed)
+    if (structured.length > 0) {
+      parts.push(`\n${structured}`)
+    }
+  } else if (context.visibleText && context.visibleText.length > 0) {
     const extracted = extractSemanticContent(context.visibleText.join('\n'), context.appName)
     if (extracted.length > 0) {
       parts.push(`\nVisible content:\n${extracted}`)
     }
   }
 
-  const hasVisibleText = (context.visibleText?.length ?? 0) > 0
+  const hasVisibleText =
+    parsed !== null || (context.visibleText?.length ?? 0) > 0
 
-  console.log(`[context-builder] Built context: ${context.appName} — ${parts.join('\n').length} chars, ${context.visibleText?.length ?? 0} text items`)
+  console.log(`[context-builder] Built context: ${context.appName} — ${parts.join('\n').length} chars, parsed=${!!parsed}`)
 
   parts.push(`</active_context>`)
 
@@ -67,6 +107,68 @@ export async function buildContextPrompt(
     hasVisibleText,
     appName: context.appName
   }
+}
+
+/**
+ * Format parsed structured context into a human-readable block for the LLM.
+ */
+function formatParsedContext(parsed: ParsedContext): string {
+  const sections: string[] = []
+
+  if (parsed.activeConversations?.length) {
+    for (const conv of parsed.activeConversations) {
+      sections.push(formatConversation(conv))
+    }
+  }
+
+  if (parsed.tasks?.length) {
+    sections.push(formatTasks(parsed.tasks))
+  }
+
+  return sections.join('\n\n')
+}
+
+function formatConversation(conv: ParsedConversation): string {
+  const lines: string[] = []
+
+  // Header
+  const channelLabel = conv.channel ? ` ${conv.channel}` : ''
+  lines.push(`${conv.app} conversation:${channelLabel}`)
+
+  if (conv.participants.length > 0) {
+    const names = conv.participants.map((p) => p.name).join(', ')
+    lines.push(`Participants: ${names}`)
+  }
+
+  // Messages
+  if (conv.messages.length > 0) {
+    lines.push('')
+    for (const msg of conv.messages) {
+      lines.push(formatMessage(msg))
+    }
+  }
+
+  return lines.join('\n')
+}
+
+function formatMessage(msg: ParsedMessage): string {
+  const sender = msg.sender === USER ? 'You' : (msg.sender ?? 'Unknown')
+  const ts = msg.timestamp ? ` (${msg.timestamp})` : ''
+  const content = msg.content ?? ''
+  return `  ${sender}${ts}: ${content}`
+}
+
+function formatTasks(tasks: Array<{ title: string; app: string; project: string | null; dueDate: string | null; flagged: boolean }>): string {
+  const lines: string[] = [`Tasks:`]
+  for (const task of tasks) {
+    const flags: string[] = []
+    if (task.flagged) flags.push('flagged')
+    if (task.dueDate) flags.push(`due ${task.dueDate}`)
+    if (task.project) flags.push(`project: ${task.project}`)
+    const suffix = flags.length > 0 ? ` [${flags.join(', ')}]` : ''
+    lines.push(`  - ${task.title}${suffix}`)
+  }
+  return lines.join('\n')
 }
 
 /**

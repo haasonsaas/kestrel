@@ -69,6 +69,136 @@ public enum AXTreeWalker {
         return texts
     }
 
+    /// Bundle IDs for apps that have per-app parsers on the TypeScript side.
+    /// When the frontmost app matches, we return the full AX tree structure.
+    private static let parserBundleIDs: Set<String> = [
+        // Slack (native)
+        "com.tinyspeck.slackmacgap",
+        // Apple Messages
+        "com.apple.MobileSMS",
+        // WhatsApp
+        "net.whatsapp.WhatsApp",
+        // Facebook Messenger
+        "com.facebook.archon",
+    ]
+
+    /// URL patterns for browser-based parsers (Gmail, etc.)
+    /// Checked against the page URL when the frontmost app is a browser.
+    private static let parserURLPatterns: [String] = [
+        "mail.google.com",
+    ]
+
+    /// Recursively build an AXNode tree from an AXUIElement.
+    /// Only collects attributes actually needed by parsers.
+    public static func collectTree(
+        from element: AXUIElement,
+        depth: Int = 0,
+        maxDepth: Int = 20
+    ) -> AXNode {
+        let role = AXHelpers.role(element)
+        let subrole: String? = AXHelpers.subrole(element)
+        let title = AXHelpers.title(element)
+        let value = AXHelpers.textValue(element)
+        let desc = AXHelpers.descriptionValue(element)
+        let ident = AXHelpers.identifier(element)
+        let domClasses = AXHelpers.domClassList(element)
+        let frame = AXHelpers.frame(element)
+
+        var childNodes: [AXNode] = []
+        if depth < maxDepth {
+            for child in AXHelpers.children(element) {
+                childNodes.append(collectTree(from: child, depth: depth + 1, maxDepth: maxDepth))
+            }
+        }
+
+        return AXNode(
+            role: role,
+            subrole: subrole,
+            title: title,
+            value: value,
+            description: desc,
+            identifier: ident,
+            domClassList: domClasses,
+            frame: frame,
+            children: childNodes
+        )
+    }
+
+    /// Check if an app (by bundleId and URL) should get structured tree output.
+    private static func needsStructuredTree(bundleId: String, url: String?) -> Bool {
+        if parserBundleIDs.contains(bundleId) {
+            return true
+        }
+        // For browsers, check URL patterns
+        if let url = url {
+            for pattern in parserURLPatterns {
+                if url.contains(pattern) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// Get context with optional structured AX tree for apps that have parsers.
+    public static func getContextWithTree() -> (context: AppContext, tree: AXNode?)? {
+        guard let frontApp = AXHelpers.getFrontmostApp() else {
+            if let cached = lastExternalContext {
+                return (context: cached, tree: nil)
+            }
+            return nil
+        }
+
+        let isOurApp = excludedBundleIDs.contains(frontApp.bundleId) ||
+                       frontApp.name.lowercased().contains("electron") ||
+                       frontApp.name.lowercased().contains("kestrel")
+        if isOurApp {
+            if let cached = lastExternalContext {
+                return (context: cached, tree: nil)
+            }
+            return nil
+        }
+
+        let axApp = AXHelpers.appElement(pid: frontApp.pid)
+        let window = AXHelpers.focusedWindow(axApp)
+
+        let url = BrowserParser.getURL(bundleId: frontApp.bundleId)
+
+        // Collect flat text (always, for fallback / generic use)
+        var visibleText: [String] = []
+        if let window = window {
+            let rawText = collectText(from: window, maxDepth: 12)
+            var seen = Set<String>()
+            for text in rawText {
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.count > 2, !seen.contains(trimmed) {
+                    seen.insert(trimmed)
+                    visibleText.append(trimmed)
+                }
+                if visibleText.count >= 150 { break }
+            }
+        }
+
+        // Collect structured tree only for apps with parsers
+        var tree: AXNode? = nil
+        if needsStructuredTree(bundleId: frontApp.bundleId, url: url?.url),
+           let window = window {
+            tree = collectTree(from: window, maxDepth: 20)
+        }
+
+        let context = AppContext(
+            appName: frontApp.name,
+            bundleId: frontApp.bundleId,
+            windowTitle: frontApp.windowTitle,
+            url: url?.url,
+            pageTitle: url?.title ?? frontApp.windowTitle,
+            visibleText: visibleText.isEmpty ? nil : visibleText
+        )
+
+        lastExternalContext = context
+        return (context: context, tree: tree)
+    }
+
     /// Find the first element with a specific role in the tree
     public static func findFirst(
         in element: AXUIElement,

@@ -27,6 +27,52 @@ public enum AXHelpers {
         value(element, attribute: kAXTitleAttribute)
     }
 
+    /// Get subrole
+    public static func subrole(_ element: AXUIElement) -> String? {
+        value(element, attribute: kAXSubroleAttribute)
+    }
+
+    /// Get description
+    public static func descriptionValue(_ element: AXUIElement) -> String? {
+        value(element, attribute: kAXDescriptionAttribute)
+    }
+
+    /// Get identifier (used by native apps like Messenger, WhatsApp)
+    public static func identifier(_ element: AXUIElement) -> String? {
+        value(element, attribute: "AXIdentifier")
+    }
+
+    /// Get DOM class list (available in web content / Electron apps)
+    public static func domClassList(_ element: AXUIElement) -> [String]? {
+        let raw: String? = value(element, attribute: "AXDOMClassList")
+        if let raw, !raw.isEmpty {
+            return raw.split(separator: " ").map(String.init)
+        }
+        // Also try as array directly
+        if let arr: [String] = value(element, attribute: "AXDOMClassList"), !arr.isEmpty {
+            return arr
+        }
+        return nil
+    }
+
+    /// Get frame (position + size)
+    public static func frame(_ element: AXUIElement) -> AXFrame? {
+        var posRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef) == .success
+        else { return nil }
+
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(posRef as! AXValue, .cgPoint, &point),
+              AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
+        else { return nil }
+
+        return AXFrame(x: Double(point.x), y: Double(point.y),
+                       width: Double(size.width), height: Double(size.height))
+    }
+
     /// Get children
     public static func children(_ element: AXUIElement) -> [AXUIElement] {
         value(element, attribute: kAXChildrenAttribute) ?? []

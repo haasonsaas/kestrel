@@ -116,6 +116,12 @@ public final class JsonRpcServer {
                 send(resp)
             }
             return
+        case "getContextTree":
+            dispatchToMain { [self] in
+                let resp = handleGetContextTree(id: request.id)
+                send(resp)
+            }
+            return
         case "getFrontmostApp":
             dispatchToMain { [self] in
                 let resp = handleGetFrontmostApp(id: request.id)
@@ -175,6 +181,25 @@ public final class JsonRpcServer {
             id: id, result: nil,
             error: JsonRpcError(code: -1, message: "Could not get context")
         )
+    }
+
+    private func handleGetContextTree(id: String?) -> JsonRpcResponse {
+        guard let result = AXTreeWalker.getContextWithTree() else {
+            return JsonRpcResponse(
+                id: id, result: nil,
+                error: JsonRpcError(code: -1, message: "Could not get context")
+            )
+        }
+        var dict: [String: Any] = [
+            "appName": result.context.appName,
+            "bundleId": result.context.bundleId,
+        ]
+        if let wt = result.context.windowTitle { dict["windowTitle"] = wt }
+        if let url = result.context.url { dict["url"] = url }
+        if let pt = result.context.pageTitle { dict["pageTitle"] = pt }
+        if let vt = result.context.visibleText { dict["visibleText"] = vt }
+        if let tree = result.tree { dict["axTree"] = tree.toDict() }
+        return JsonRpcResponse(id: id, result: AnyCodable(dict), error: nil)
     }
 
     private func handleGetFrontmostApp(id: String?) -> JsonRpcResponse {

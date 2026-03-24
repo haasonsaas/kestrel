@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import { app } from 'electron'
 import type { AppContext, PermissionStatus } from '../../shared/ipc'
+import type { ContextTreeResult } from '../parsers/types'
 
 interface JsonRpcResponse {
   jsonrpc: '2.0'
@@ -185,6 +186,19 @@ export class ContextKitClient {
       return result
     } catch (err) {
       console.error('[contextkit] getContext failed:', err)
+      return null
+    }
+  }
+
+  async getContextTree(): Promise<ContextTreeResult | null> {
+    try {
+      const result = (await this.call('getContextTree')) as ContextTreeResult
+      console.log(
+        `[contextkit] Got context tree: ${result?.appName} — tree=${result?.axTree ? 'yes' : 'no'}`
+      )
+      return result
+    } catch (err) {
+      console.error('[contextkit] getContextTree failed:', err)
       return null
     }
   }
