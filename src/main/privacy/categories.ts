@@ -74,9 +74,38 @@ export const PRIVACY_CATEGORIES: PrivacyCategory[] = [
 
 // Default excluded domains (always excluded for security)
 export const ALWAYS_EXCLUDED_DOMAINS = [
+  // Password managers
   '1password.com',
   'bitwarden.com',
   'lastpass.com',
   'dashlane.com',
-  'keepersecurity.com'
+  'keepersecurity.com',
+  'enpass.io',
+  // Banking
+  'chase.com',
+  'bankofamerica.com',
+  'wellsfargo.com',
+  'paypal.com',
+  'venmo.com',
+  // Crypto
+  'coinbase.com',
+  'binance.com',
+  'metamask.io',
+  // Auth / SSO
+  'accounts.google.com',
+  'login.microsoftonline.com',
+  'auth0.com',
+  'okta.com',
+]
+
+// Default excluded apps (always excluded — native apps with sensitive data)
+export const ALWAYS_EXCLUDED_APPS = [
+  'com.1password.1password',
+  'com.agilebits.onepassword7',
+  'com.bitwarden.desktop',
+  'com.lastpass.LastPass',
+  'com.dashlane.dashlanephonefinal',
+  'com.keepersecurity.keeper',
+  'com.enpass.Enpass',
+  'com.apple.keychainaccess',
 ]

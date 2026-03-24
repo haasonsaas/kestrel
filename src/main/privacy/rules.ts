@@ -1,11 +1,16 @@
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
-import { PRIVACY_CATEGORIES, ALWAYS_EXCLUDED_DOMAINS } from './categories'
+import { PRIVACY_CATEGORIES, ALWAYS_EXCLUDED_DOMAINS, ALWAYS_EXCLUDED_APPS } from './categories'
 import type { AppContext } from '../../shared/ipc'
 
 export function shouldExcludeContext(context: AppContext): boolean {
   const db = getDatabase()
   const rules = db.select().from(schema.privacyRules).all()
+
+  // Check always-excluded native apps (password managers, keychains, etc.)
+  if (ALWAYS_EXCLUDED_APPS.includes(context.bundleId)) {
+    return true
+  }
 
   // Check always-excluded domains
   if (context.url) {

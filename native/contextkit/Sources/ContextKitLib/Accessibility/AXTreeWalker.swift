@@ -3,11 +3,41 @@ import ApplicationServices
 /// Recursively walks the accessibility tree and collects text content
 public enum AXTreeWalker {
 
-    // Bundle IDs to skip — these are us
+    // Bundle IDs to skip — ourselves + sensitive apps that should never be read
     private static let excludedBundleIDs: Set<String> = [
+        // Kestrel itself
         "com.kestrel.app",
-        "com.github.electron",           // electron dev mode
-        "com.electron.kestrel"
+        "com.github.electron",
+        "com.electron.kestrel",
+
+        // Password managers — NEVER read these
+        "com.1password.1password",
+        "com.1password.1password.v7",
+        "com.1password.browser-support",
+        "com.agilebits.onepassword7",
+        "com.agilebits.onepassword-osx",
+        "com.bitwarden.desktop",
+        "com.lastpass.LastPass",
+        "com.dashlane.dashlanephonefinal",
+        "com.keepersecurity.keeper",
+        "org.nickvision.denaro",           // Denaro password manager
+        "com.enpass.Enpass",
+
+        // Keychain / System auth
+        "com.apple.keychainaccess",
+        "com.apple.systempreferences",     // Could show security settings
+
+        // Banking / Finance apps
+        "com.mint.Mint",
+        "com.intuit.quickbooks",
+
+        // VPN / Security tools
+        "com.wireguard.macos",
+        "com.tailscale.ipn.macos",
+
+        // SSH / Key management
+        "com.panic.Transmit",
+        "se.filezilla-project.filezilla",
     ]
 
     // Cache the last non-self context so we can return it when the user is in Kestrel
