@@ -18,6 +18,7 @@ import {
   stopMeetingRecording
 } from './meetings/handlers'
 import { detectMeeting } from './meetings/detector'
+import { registerPermissionHandlers } from './permissions'
 import { registerJournalHandlers } from './journal/handlers'
 import { MCPServerManager } from './mcp/manager'
 import { registerMCPHandlers } from './mcp/handlers'
@@ -60,6 +61,7 @@ app.whenReady().then(() => {
   registerMeetingHandlers(contextKit)
   registerJournalHandlers()
   registerMCPHandlers(mcpManager)
+  registerPermissionHandlers(contextKit)
 
   // Context IPC handlers
   ipcMain.handle('context:get', async () => {

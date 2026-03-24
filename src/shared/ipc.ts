@@ -55,6 +55,11 @@ export type IpcChannels = {
   'mcp:stopServer': { args: [name: string]; return: void }
   'mcp:listTools': { args: []; return: MCPTool[] }
 
+  // Permissions
+  'permissions:check': { args: []; return: { accessibility: boolean; microphone: boolean; screenRecording: boolean; allGranted: boolean } }
+  'permissions:request': { args: [permission: string]; return: boolean }
+  'permissions:openSettings': { args: [pane?: string]; return: void }
+
   // Events / Observability
   'events:snapshot': { args: [windowMinutes?: number]; return: unknown }
   'events:recent': { args: [limit?: number]; return: unknown[] }
