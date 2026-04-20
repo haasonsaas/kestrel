@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Check, LogIn, LogOut, RefreshCw, Save } from 'lucide-react'
 import {
+  EVALOPS_DEFAULT_AGENT_ID,
+  EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
+  EVALOPS_DEFAULT_MEMORY_BASE_URL,
   EVALOPS_DEFAULT_RESOURCE,
-  EVALOPS_DEFAULT_SCOPES
+  EVALOPS_DEFAULT_SCOPES,
+  EVALOPS_DEFAULT_SKILLS_BASE_URL,
+  EVALOPS_DEFAULT_TRACES_BASE_URL,
+  EVALOPS_DEFAULT_WORKSPACE_ID
 } from '@shared/config'
-import type { EvalOpsAuthStatus } from '@shared/ipc'
+import type { EvalOpsAuthStatus, EvalOpsServiceStatus } from '@shared/ipc'
 
 interface StoredEvalOpsConfig {
   identityBaseUrl?: string
   resource?: string
   scopes?: string[]
+  agentRegistryBaseUrl?: string
+  skillsBaseUrl?: string
+  memoryBaseUrl?: string
+  tracesBaseUrl?: string
+  workspaceId?: string
+  agentId?: string
 }
 
 export function EvalOpsSettings() {
@@ -18,6 +30,13 @@ export function EvalOpsSettings() {
   const [identityBaseUrl, setIdentityBaseUrl] = useState(EVALOPS_DEFAULT_IDENTITY_BASE_URL)
   const [resource, setResource] = useState(EVALOPS_DEFAULT_RESOURCE)
   const [scopes, setScopes] = useState(EVALOPS_DEFAULT_SCOPES.join(' '))
+  const [agentRegistryBaseUrl, setAgentRegistryBaseUrl] = useState(EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL)
+  const [skillsBaseUrl, setSkillsBaseUrl] = useState(EVALOPS_DEFAULT_SKILLS_BASE_URL)
+  const [memoryBaseUrl, setMemoryBaseUrl] = useState(EVALOPS_DEFAULT_MEMORY_BASE_URL)
+  const [tracesBaseUrl, setTracesBaseUrl] = useState(EVALOPS_DEFAULT_TRACES_BASE_URL)
+  const [workspaceId, setWorkspaceId] = useState(EVALOPS_DEFAULT_WORKSPACE_ID)
+  const [agentId, setAgentId] = useState(EVALOPS_DEFAULT_AGENT_ID)
+  const [serviceStatuses, setServiceStatuses] = useState<EvalOpsServiceStatus[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +48,12 @@ export function EvalOpsSettings() {
     if (stored?.identityBaseUrl) setIdentityBaseUrl(stored.identityBaseUrl)
     if (stored?.resource) setResource(stored.resource)
     if (stored?.scopes?.length) setScopes(stored.scopes.join(' '))
+    if (stored?.agentRegistryBaseUrl) setAgentRegistryBaseUrl(stored.agentRegistryBaseUrl)
+    if (stored?.skillsBaseUrl) setSkillsBaseUrl(stored.skillsBaseUrl)
+    if (stored?.memoryBaseUrl) setMemoryBaseUrl(stored.memoryBaseUrl)
+    if (stored?.tracesBaseUrl) setTracesBaseUrl(stored.tracesBaseUrl)
+    if (stored?.workspaceId) setWorkspaceId(stored.workspaceId)
+    if (stored?.agentId) setAgentId(stored.agentId)
     setStatus(await window.api.invoke('evalops:authStatus'))
   }, [])
 
@@ -43,7 +68,13 @@ export function EvalOpsSettings() {
       await window.api.invoke('settings:set', 'evalops_config', {
         identityBaseUrl: identityBaseUrl.trim(),
         resource: resource.trim(),
-        scopes: parsedScopes
+        scopes: parsedScopes,
+        agentRegistryBaseUrl: agentRegistryBaseUrl.trim(),
+        skillsBaseUrl: skillsBaseUrl.trim(),
+        memoryBaseUrl: memoryBaseUrl.trim(),
+        tracesBaseUrl: tracesBaseUrl.trim(),
+        workspaceId: workspaceId.trim(),
+        agentId: agentId.trim()
       })
       setStatus(await window.api.invoke('evalops:authStatus'))
       setMessage('Saved EvalOps settings.')
@@ -53,7 +84,7 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [identityBaseUrl, parsedScopes, resource])
+  }, [agentId, agentRegistryBaseUrl, identityBaseUrl, memoryBaseUrl, parsedScopes, resource, skillsBaseUrl, tracesBaseUrl, workspaceId])
 
   const signIn = useCallback(async () => {
     setBusy(true)
@@ -96,6 +127,19 @@ export function EvalOpsSettings() {
       setBusy(false)
     }
   }, [])
+
+  const checkServices = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await saveConfig()
+      setServiceStatuses(await window.api.invoke('evalops:servicesStatus'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }, [saveConfig])
 
   return (
     <div>
@@ -170,6 +214,83 @@ export function EvalOpsSettings() {
           onChange={setScopes}
           placeholder={EVALOPS_DEFAULT_SCOPES.join(' ')}
         />
+
+        <div className="grid grid-cols-2 gap-4">
+          <TextSetting
+            label="Workspace ID"
+            value={workspaceId}
+            onChange={setWorkspaceId}
+            placeholder={EVALOPS_DEFAULT_WORKSPACE_ID}
+          />
+          <TextSetting
+            label="Agent ID"
+            value={agentId}
+            onChange={setAgentId}
+            placeholder={EVALOPS_DEFAULT_AGENT_ID}
+          />
+        </div>
+
+        <div className="space-y-4 border-t border-border pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-medium mb-1">Platform Services</h4>
+              <p className="text-xs text-muted-foreground">
+                Connect-RPC endpoints for agent registry, skills, memory, and traces.
+              </p>
+            </div>
+            <button
+              onClick={checkServices}
+              disabled={busy || !status?.authenticated}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Check
+            </button>
+          </div>
+
+          <TextSetting
+            label="Agent Registry URL"
+            value={agentRegistryBaseUrl}
+            onChange={setAgentRegistryBaseUrl}
+            placeholder={EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL}
+          />
+          <TextSetting
+            label="Skills URL"
+            value={skillsBaseUrl}
+            onChange={setSkillsBaseUrl}
+            placeholder={EVALOPS_DEFAULT_SKILLS_BASE_URL}
+          />
+          <TextSetting
+            label="Memory URL"
+            value={memoryBaseUrl}
+            onChange={setMemoryBaseUrl}
+            placeholder={EVALOPS_DEFAULT_MEMORY_BASE_URL}
+          />
+          <TextSetting
+            label="Traces URL"
+            value={tracesBaseUrl}
+            onChange={setTracesBaseUrl}
+            placeholder={EVALOPS_DEFAULT_TRACES_BASE_URL}
+          />
+
+          {serviceStatuses.length > 0 && (
+            <div className="space-y-2">
+              {serviceStatuses.map((item) => (
+                <div key={item.service} className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm">
+                  {item.ok
+                    ? <Check className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                    : <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                  }
+                  <div className="min-w-0">
+                    <p className="font-medium">{item.service}</p>
+                    <p className="text-xs text-muted-foreground truncate">{item.baseUrl}</p>
+                    {item.error && <p className="text-xs text-red-600 mt-1">{item.error}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           <button
