@@ -11,6 +11,7 @@ import { createHummingbirdWindow, toggleHummingbird, hideHummingbird } from './w
 import { initDatabase, getDatabase, closeDatabase } from './db'
 import * as schema from './db/schema'
 import { registerIpcHandlers } from './ipc/handlers'
+import { installIpcOriginGuard } from './ipc/security'
 import { registerAIHandlers, setContextKit } from './ai/handlers'
 import { ContextKitClient } from './native/contextkit-client'
 import {
@@ -97,6 +98,7 @@ if (!gotSingleInstanceLock) {
   })
 
   // Register IPC handlers
+  installIpcOriginGuard()
   registerIpcHandlers()
   registerAIHandlers(contextKit, mcpManager)
   registerMeetingHandlers(contextKit)
