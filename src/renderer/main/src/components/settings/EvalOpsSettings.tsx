@@ -4,6 +4,7 @@ import {
   EVALOPS_DEFAULT_AGENT_ID,
   EVALOPS_DEFAULT_BASE_URL,
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
+  EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL,
   EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
@@ -15,6 +16,7 @@ interface StoredEvalOpsConfig {
   identityBaseUrl?: string
   baseUrl?: string
   token?: string
+  llmGatewayBaseUrl?: string
   resource?: string
   scopes?: string[]
   agentRegistryBaseUrl?: string
@@ -35,6 +37,7 @@ export function EvalOpsSettings() {
   const [status, setStatus] = useState<EvalOpsAuthStatus | null>(null)
   const [identityBaseUrl, setIdentityBaseUrl] = useState(EVALOPS_DEFAULT_IDENTITY_BASE_URL)
   const [baseUrl, setBaseUrl] = useState(EVALOPS_DEFAULT_BASE_URL)
+  const [llmGatewayBaseUrl, setLlmGatewayBaseUrl] = useState(EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL)
   const [token, setToken] = useState('')
   const [resource, setResource] = useState(EVALOPS_DEFAULT_RESOURCE)
   const [scopes, setScopes] = useState(EVALOPS_DEFAULT_SCOPES.join(' '))
@@ -56,6 +59,7 @@ export function EvalOpsSettings() {
     const stored = await window.api.invoke('settings:get', 'evalops_config') as StoredEvalOpsConfig | null
     if (stored?.identityBaseUrl) setIdentityBaseUrl(stored.identityBaseUrl)
     if (stored?.baseUrl) setBaseUrl(stored.baseUrl)
+    if (stored?.llmGatewayBaseUrl) setLlmGatewayBaseUrl(stored.llmGatewayBaseUrl)
     if (stored?.token) setToken(stored.token)
     if (stored?.resource) setResource(stored.resource)
     if (stored?.scopes?.length) setScopes(stored.scopes.join(' '))
@@ -79,6 +83,7 @@ export function EvalOpsSettings() {
       await window.api.invoke('settings:set', 'evalops_config', {
         identityBaseUrl: identityBaseUrl.trim(),
         baseUrl: baseUrl.trim(),
+        llmGatewayBaseUrl: llmGatewayBaseUrl.trim(),
         token: token.trim(),
         resource: resource.trim(),
         scopes: parsedScopes,
@@ -99,7 +104,7 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [agentId, baseUrl, identityBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, scopes, token, workspaceId])
+  }, [agentId, baseUrl, identityBaseUrl, llmGatewayBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, scopes, token, workspaceId])
 
   const signIn = useCallback(async () => {
     setBusy(true)
@@ -216,6 +221,13 @@ export function EvalOpsSettings() {
           value={baseUrl}
           onChange={setBaseUrl}
           placeholder={EVALOPS_DEFAULT_BASE_URL}
+        />
+
+        <TextSetting
+          label="LLM Gateway Base URL"
+          value={llmGatewayBaseUrl}
+          onChange={setLlmGatewayBaseUrl}
+          placeholder={EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL}
         />
 
         <TextSetting

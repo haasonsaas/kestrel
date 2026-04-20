@@ -60,6 +60,7 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
   const stored = getSettingValue<StoredEvalOpsConfig>(EVALOPS_CONFIG_KEY) ?? {}
   const llmGatewayBaseUrl = cleanUrl(
     process.env.EVALOPS_LLM_GATEWAY_BASE_URL,
+    process.env.KESTREL_LLM_GATEWAY_BASE,
     asString(stored.llmGatewayBaseUrl),
     EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL
   )
