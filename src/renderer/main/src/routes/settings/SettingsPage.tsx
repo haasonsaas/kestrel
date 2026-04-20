@@ -19,9 +19,9 @@ import { PrivacyControls } from '@/components/settings/PrivacyControls'
 import { MCPServers } from '@/components/settings/MCPServers'
 import { APIKeySettings as APIKeySettingsComponent } from '@/components/settings/APIKeySettings'
 import { EvalOpsSettings as EvalOpsSettingsComponent } from '@/components/settings/EvalOpsSettings'
-import type { KeyboardShortcut } from '@shared/ipc'
+import type { AppDeepLinkSettingsTab, KeyboardShortcut } from '@shared/ipc'
 
-type SettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'evalops' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
+type SettingsTab = AppDeepLinkSettingsTab
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Settings }> = [
   { id: 'general', label: 'General', icon: Settings },
@@ -35,8 +35,18 @@ const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Settings }> = [
   { id: 'events', label: 'Event Log', icon: Activity }
 ]
 
-export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+export function SettingsPage({
+  activeTab: requestedTab = 'general',
+  activeTabVersion = 0
+}: {
+  activeTab?: SettingsTab
+  activeTabVersion?: number
+}) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(requestedTab)
+
+  useEffect(() => {
+    setActiveTab(requestedTab)
+  }, [requestedTab, activeTabVersion])
 
   return (
     <div className="flex h-full">
