@@ -70,8 +70,6 @@ public final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegat
             handleAudioBuffer(sampleBuffer)
         case .screen:
             break // Discard video frames
-        case .microphone:
-            break // Not using SCK mic capture
         @unknown default:
             break
         }
