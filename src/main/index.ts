@@ -29,6 +29,12 @@ import { registerEvalOpsHandlers } from './evalops/handlers'
 import { registerUpdateHandlers } from './updates'
 import { registerKeyboardShortcutHandlers, unregisterKeyboardShortcuts } from './shortcuts'
 import { registerPlatformNotificationHandlers, unregisterPlatformNotificationHandlers } from './platform-notifications'
+import {
+  findEvalOpsDeepLinkArg,
+  openEvalOpsDeepLink,
+  registerDeepLinkHandlers,
+  registerEvalOpsProtocol
+} from './deep-links'
 import { shouldExcludeContext } from './privacy/rules'
 import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wide-event'
 
@@ -47,9 +53,32 @@ let lastSnapshotTime = 0
 // Voice recording state
 let voiceRecordingActive = false
 
-app.whenReady().then(async () => {
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const deepLink = findEvalOpsDeepLinkArg(argv)
+    if (deepLink) {
+      openEvalOpsDeepLink(deepLink)
+      return
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    openEvalOpsDeepLink(url)
+  })
+
+  app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.kestrel.app')
+  registerEvalOpsProtocol()
 
   // Initialize database
   initDatabase()
@@ -104,6 +133,9 @@ app.whenReady().then(async () => {
   overlayPanel = createOverlayPanel()
   meetingStatusPanel = createMeetingStatusPanel()
   hummingbirdWindow = createHummingbirdWindow()
+  registerDeepLinkHandlers({ getMainWindow: () => mainWindow })
+  const startupDeepLink = findEvalOpsDeepLinkArg(process.argv)
+  if (startupDeepLink) openEvalOpsDeepLink(startupDeepLink)
   registerPlatformNotificationHandlers({ getMainWindow: () => mainWindow })
 
   // ── System tray ──────────────────────────────────────
@@ -228,7 +260,8 @@ app.whenReady().then(async () => {
       mainWindow.show()
     }
   })
-})
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

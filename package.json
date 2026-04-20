@@ -91,6 +91,14 @@
         "repo": "kestrel"
       }
     ],
+    "protocols": [
+      {
+        "name": "EvalOps Links",
+        "schemes": [
+          "evalops"
+        ]
+      }
+    ],
     "files": [
       "out/**/*"
     ],

@@ -91,6 +91,8 @@ export type IpcChannels = {
   'app:updateStatus': { args: []; return: UpdateStatus }
   'app:checkForUpdates': { args: []; return: UpdateStatus }
   'app:installUpdate': { args: []; return: boolean }
+  'app:openDeepLink': { args: [url: string]; return: AppDeepLinkTarget | null }
+  'app:getPendingDeepLink': { args: []; return: AppDeepLinkTarget | null }
 
   // Platform notifications
   'platformNotifications:list': { args: []; return: PlatformNotificationEvent[] }
@@ -121,6 +123,7 @@ export type IpcEvents = {
   'hummingbird:voiceTranscript': { text: string }
   'hummingbird:voiceRecording': { recording: boolean }
   'app:updateStatusChanged': UpdateStatus
+  'app:deepLink': AppDeepLinkTarget
   'platformNotification:received': PlatformNotificationEvent
 }
 
@@ -222,6 +225,19 @@ export interface UpdateStatus {
     releaseNotes?: string | Array<{ version?: string; note?: string }>
     releaseDate?: string
   }
+}
+
+export type AppDeepLinkNavItem = 'chat' | 'meetings' | 'journal' | 'arena' | 'settings'
+export type AppDeepLinkSettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'evalops' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
+export type AppDeepLinkKind = 'agent' | 'trace' | 'approval' | 'settings' | 'unknown'
+
+export interface AppDeepLinkTarget {
+  url: string
+  kind: AppDeepLinkKind
+  nav: AppDeepLinkNavItem
+  id?: string
+  settingsTab?: AppDeepLinkSettingsTab
+  params: Record<string, string>
 }
 
 export type KeyboardShortcutId = 'toggleQuickAccess' | 'newChat' | 'toggleRecording'
