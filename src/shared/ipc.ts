@@ -87,6 +87,9 @@ export type IpcChannels = {
   // App
   'app:getVersion': { args: []; return: string }
   'app:getPlatform': { args: []; return: string }
+  'app:updateStatus': { args: []; return: UpdateStatus }
+  'app:checkForUpdates': { args: []; return: UpdateStatus }
+  'app:installUpdate': { args: []; return: boolean }
 }
 
 // Push events (main → renderer)
@@ -106,6 +109,7 @@ export type IpcEvents = {
   'hummingbird:voiceMode': { active: boolean }
   'hummingbird:voiceTranscript': { text: string }
   'hummingbird:voiceRecording': { recording: boolean }
+  'app:updateStatusChanged': UpdateStatus
 }
 
 // Data types
@@ -193,6 +197,19 @@ export interface AIModel {
   name: string
   provider: string
   contextWindow: number
+}
+
+export interface UpdateStatus {
+  available: boolean
+  checking: boolean
+  downloaded: boolean
+  error?: string
+  info?: {
+    version?: string
+    releaseName?: string
+    releaseNotes?: string | Array<{ version?: string; note?: string }>
+    releaseDate?: string
+  }
 }
 
 export interface EvalOpsLoginOptions {
