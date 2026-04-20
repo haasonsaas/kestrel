@@ -181,6 +181,57 @@ export async function recordEvalOpsChatTrace(input: {
   await ingestEvalOpsSpans({ spans: [span] })
 }
 
+export async function recordEvalOpsTelemetryTrace(fields: {
+  event_id: string
+  event_type: string
+  timestamp: string
+  started_at: number
+  finished_at?: number
+  duration_ms?: number
+  outcome?: string
+  error?: string
+  [key: string]: unknown
+}): Promise<void> {
+  const config = getEvalOpsConfig()
+  const session = getStoredEvalOpsSession()
+  if (!config.token && !session) return
+
+  const status = fields.outcome === 'error' ? 'SPAN_STATUS_ERROR' : 'SPAN_STATUS_OK'
+  const startedAt = Number.isFinite(fields.started_at) ? new Date(fields.started_at).toISOString() : fields.timestamp
+  const endedAt = Number.isFinite(fields.finished_at) ? new Date(fields.finished_at).toISOString() : startedAt
+  const span: EvalOpsTraceSpan = {
+    traceId: uuid(),
+    spanId: fields.event_id,
+    workspaceId: config.workspaceId,
+    organizationId: session?.organizationId,
+    agentId: config.agentId,
+    surface: 'kestrel',
+    name: `wide_event.${fields.event_type}`,
+    kind: 'telemetry',
+    latencyMs: typeof fields.duration_ms === 'number' ? fields.duration_ms : undefined,
+    status,
+    attributes: telemetryAttributes(fields),
+    startedAt,
+    endedAt
+  }
+
+  await ingestEvalOpsSpans({ spans: [span] })
+}
+
+function telemetryAttributes(fields: Record<string, unknown>): Record<string, unknown> {
+  const attributes: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue
+    if (key === 'event_id' || key === 'started_at' || key === 'finished_at') continue
+    if (typeof value === 'string') {
+      attributes[key] = value.length > 512 ? `${value.slice(0, 512)}...` : value
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      attributes[key] = value
+    }
+  }
+  return attributes
+}
+
 function cleanRecord<T extends Record<string, unknown>>(record: T): T {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(record)) {
