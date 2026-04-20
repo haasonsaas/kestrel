@@ -1,6 +1,11 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater, type UpdateInfo } from 'electron-updater'
 
+const UPDATE_OWNER = 'evalops'
+const UPDATE_REPO = 'kestrel'
+const ALLOWED_UPDATE_HOSTS = new Set(['github.com'])
+const SAFE_GITHUB_SLUG = /^[a-zA-Z0-9_.-]+$/u
+
 export interface UpdateStatus {
   available: boolean
   checking: boolean
@@ -18,11 +23,7 @@ let status: UpdateStatus = {
 export function registerUpdateHandlers(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
-  autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: 'evalops',
-    repo: 'kestrel'
-  })
+  autoUpdater.setFeedURL(validatedGitHubUpdateFeed(UPDATE_OWNER, UPDATE_REPO))
 
   autoUpdater.on('checking-for-update', () => {
     status = { ...status, checking: true, error: undefined }
@@ -65,6 +66,44 @@ export function registerUpdateHandlers(): void {
     setTimeout(() => {
       void checkForUpdates()
     }, 10_000)
+  }
+}
+
+function validatedGitHubUpdateFeed(owner: string, repo: string): { provider: 'github'; owner: string; repo: string } {
+  const safeOwner = validateGithubSlug(owner, 'owner')
+  const safeRepo = validateGithubSlug(repo, 'repo')
+  validateUpdateUrl(`https://github.com/${safeOwner}/${safeRepo}/releases`)
+  return {
+    provider: 'github',
+    owner: safeOwner,
+    repo: safeRepo
+  }
+}
+
+function validateGithubSlug(value: string, label: string): string {
+  const trimmed = value.trim()
+  if (!SAFE_GITHUB_SLUG.test(trimmed)) {
+    throw new Error(`Invalid update ${label}.`)
+  }
+  return trimmed
+}
+
+function validateUpdateUrl(rawUrl: string): void {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    throw new Error('Invalid update URL.')
+  }
+
+  if (url.protocol !== 'https:') {
+    throw new Error('Update URL must use HTTPS.')
+  }
+  if (!ALLOWED_UPDATE_HOSTS.has(url.hostname)) {
+    throw new Error('Update URL host is not allowed.')
+  }
+  if (!url.pathname.startsWith(`/${UPDATE_OWNER}/${UPDATE_REPO}/releases`)) {
+    throw new Error('Update URL path is not allowed.')
   }
 }
 
