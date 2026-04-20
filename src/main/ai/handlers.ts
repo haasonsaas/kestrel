@@ -10,8 +10,8 @@
  */
 
 import { ipcMain } from 'electron'
-import { chatCompletionStream, AVAILABLE_MODELS } from './openrouter'
-import type { ChatMessage } from './openrouter'
+import { chatCompletionStream, AVAILABLE_MODELS } from './llm-gateway'
+import type { ChatMessage } from './llm-gateway'
 import { setPresenterDeps, handleChatStream } from './presenter-agent'
 import type { ContextKitClient } from '../native/contextkit-client'
 import type { MCPServerManager } from '../mcp/manager'

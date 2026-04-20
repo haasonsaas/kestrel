@@ -4,7 +4,7 @@ import { parseContext } from '../parsers'
 import type { ParsedContext, ParsedConversation, ParsedMessage } from '../parsers/types'
 import { USER } from '../parsers/types'
 import type { AppContext, MCPTool } from '../../shared/ipc'
-import type { OpenAITool } from './openrouter'
+import type { OpenAITool } from './llm-gateway'
 
 export interface ContextPromptResult {
   block: string

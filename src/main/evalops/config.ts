@@ -4,6 +4,7 @@ import {
   EVALOPS_DEFAULT_AGENT_ID,
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
   EVALOPS_DEFAULT_MEMORY_BASE_URL,
+  EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
   EVALOPS_DEFAULT_SKILLS_BASE_URL,
@@ -26,6 +27,14 @@ export interface EvalOpsConfig {
   scopes: string[]
   workspaceId: string
   agentId: string
+  providerRef: EvalOpsProviderRef
+}
+
+export interface EvalOpsProviderRef {
+  provider: string
+  environment: string
+  credentialName?: string
+  teamId?: string
 }
 
 interface StoredEvalOpsConfig {
@@ -39,6 +48,7 @@ interface StoredEvalOpsConfig {
   scopes?: unknown
   workspaceId?: unknown
   agentId?: unknown
+  providerRef?: unknown
 }
 
 export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOpsConfig {
@@ -96,7 +106,8 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
       process.env.EVALOPS_AGENT_ID,
       asString(stored.agentId),
       EVALOPS_DEFAULT_AGENT_ID
-    )
+    ),
+    providerRef: cleanProviderRef(stored.providerRef)
   }
 }
 
@@ -128,4 +139,34 @@ function asStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const strings = value.filter((item): item is string => typeof item === 'string')
   return strings.length > 0 ? strings : undefined
+}
+
+function cleanProviderRef(value: unknown): EvalOpsProviderRef {
+  const raw = isRecord(value) ? value : {}
+  return {
+    provider: cleanString(
+      process.env.EVALOPS_PROVIDER_REF_PROVIDER,
+      asString(raw.provider),
+      EVALOPS_DEFAULT_PROVIDER_REF.provider
+    ),
+    environment: cleanString(
+      process.env.EVALOPS_PROVIDER_REF_ENVIRONMENT,
+      asString(raw.environment),
+      EVALOPS_DEFAULT_PROVIDER_REF.environment
+    ),
+    credentialName: cleanString(
+      process.env.EVALOPS_PROVIDER_REF_CREDENTIAL_NAME,
+      asString(raw.credentialName),
+      EVALOPS_DEFAULT_PROVIDER_REF.credentialName
+    ),
+    teamId: cleanString(
+      process.env.EVALOPS_PROVIDER_REF_TEAM_ID,
+      asString(raw.teamId),
+      EVALOPS_DEFAULT_PROVIDER_REF.teamId
+    )
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
