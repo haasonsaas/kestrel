@@ -371,6 +371,7 @@ function emitLlmUsageEvent(input: LlmUsageEventInput): void {
     : estimateCostUsd(resolvedModel, inputTokens, outputTokens)
   const provider = input.gateway.providerRef.provider || providerFromModel(resolvedModel)
   const event = WideEvent.start('llm_usage', {
+    started_at: Date.now() - input.latencyMs,
     model: resolvedModel,
     provider,
     input_tokens: inputTokens,
