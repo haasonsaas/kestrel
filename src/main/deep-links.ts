@@ -14,6 +14,8 @@ const SETTINGS_TABS = new Set<AppDeepLinkSettingsTab>([
   'shortcuts',
   'events'
 ])
+const SAFE_PATH_SEGMENT = /^[a-zA-Z0-9._:@-]{1,160}$/u
+const SAFE_QUERY_VALUE = /^[a-zA-Z0-9._:@ -]{0,200}$/u
 
 let getMainWindow: MainWindowGetter = () => null
 let pendingDeepLink: AppDeepLinkTarget | null = null
@@ -83,35 +85,31 @@ function parseEvalOpsDeepLink(rawUrl: string): AppDeepLinkTarget | null {
 
   if (parsed.protocol !== 'evalops:') return null
 
-  const parts = [
-    parsed.hostname,
-    ...parsed.pathname.split('/').map((part) => decodeURIComponent(part)).filter(Boolean)
-  ].filter(Boolean)
+  const parts = sanitizedPathParts(parsed)
+  if (!parts || parts.length === 0 || parts.length > 2) return null
+
   const root = parts[0]?.toLowerCase() ?? ''
   const id = parts[1]
-  const params = Object.fromEntries(parsed.searchParams.entries())
+  const params = sanitizedSearchParams(parsed)
 
   if (root === 'agent' || root === 'agents') {
+    if (!id) return null
     return target(rawUrl, 'agent', 'evalops', id, params)
   }
   if (root === 'trace' || root === 'traces') {
+    if (!id) return null
     return target(rawUrl, 'trace', 'events', id, params)
   }
   if (root === 'approval' || root === 'approvals') {
+    if (!id) return null
     return target(rawUrl, 'approval', 'evalops', id, params)
   }
   if (root === 'settings') {
-    return target(rawUrl, 'settings', normalizeSettingsTab(id) ?? 'evalops', undefined, params)
+    const settingsTab = normalizeSettingsTab(id) ?? normalizeSettingsTab(params.tab) ?? 'evalops'
+    return target(rawUrl, 'settings', settingsTab, undefined, params)
   }
 
-  return {
-    url: rawUrl,
-    kind: 'unknown',
-    nav: 'settings',
-    settingsTab: 'evalops',
-    id,
-    params
-  }
+  return null
 }
 
 function target(
@@ -137,4 +135,38 @@ function normalizeSettingsTab(value: string | undefined): AppDeepLinkSettingsTab
   return SETTINGS_TABS.has(normalized as AppDeepLinkSettingsTab)
     ? normalized as AppDeepLinkSettingsTab
     : undefined
+}
+
+function sanitizedPathParts(url: URL): string[] | null {
+  const rawParts = [
+    url.hostname,
+    ...url.pathname.split('/')
+  ].filter(Boolean)
+  const parts: string[] = []
+
+  for (const part of rawParts) {
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(part).trim()
+    } catch {
+      return null
+    }
+
+    if (!decoded) continue
+    if (!SAFE_PATH_SEGMENT.test(decoded)) return null
+    if (decoded === '.' || decoded === '..') return null
+    parts.push(decoded)
+  }
+
+  return parts
+}
+
+function sanitizedSearchParams(url: URL): Record<string, string> {
+  const params: Record<string, string> = {}
+  for (const [key, value] of url.searchParams.entries()) {
+    if (!SAFE_PATH_SEGMENT.test(key)) continue
+    if (!SAFE_QUERY_VALUE.test(value)) continue
+    params[key] = value.trim()
+  }
+  return params
 }
