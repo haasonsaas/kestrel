@@ -1,17 +1,9 @@
-import { getDatabase } from '../db'
-import * as schema from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { getSettingValue } from '../evalops/settings'
 
 const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
 function getOpenAIKey(): string | null {
-  const db = getDatabase()
-  const row = db
-    .select()
-    .from(schema.settings)
-    .where(eq(schema.settings.key, 'openai_api_key'))
-    .get()
-  return row ? JSON.parse(row.value) : null
+  return getSettingValue<string>('openai_api_key')
 }
 
 export async function transcribeAudio(
