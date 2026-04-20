@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { eq, desc } from 'drizzle-orm'
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
+import { getAllSettingValues, getSettingValue, setSettingValue } from '../evalops/settings'
 import type {
   Thread, Message, CreateMessage,
   Meeting, CreateMeeting,
@@ -18,24 +19,15 @@ export function registerIpcHandlers(): void {
   // ── Settings ──────────────────────────────────────────
 
   ipcMain.handle('settings:get', async (_e, key: string) => {
-    const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get()
-    return row ? JSON.parse(row.value) : null
+    return getSettingValue(key)
   })
 
   ipcMain.handle('settings:set', async (_e, key: string, value: unknown) => {
-    db.insert(schema.settings)
-      .values({ key, value: JSON.stringify(value) })
-      .onConflictDoUpdate({ target: schema.settings.key, set: { value: JSON.stringify(value) } })
-      .run()
+    setSettingValue(key, value)
   })
 
   ipcMain.handle('settings:getAll', async () => {
-    const rows = db.select().from(schema.settings).all()
-    const result: Record<string, unknown> = {}
-    for (const row of rows) {
-      result[row.key] = JSON.parse(row.value)
-    }
-    return result
+    return getAllSettingValues()
   })
 
   // ── Threads ───────────────────────────────────────────

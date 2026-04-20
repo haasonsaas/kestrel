@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { v4 as uuid } from 'uuid'
-import { eq } from 'drizzle-orm'
 import path from 'path'
 import fs from 'fs'
 import { createMainWindow } from './windows/mainWindow'
@@ -38,6 +37,7 @@ import {
 } from './deep-links'
 import { shouldExcludeContext } from './privacy/rules'
 import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wide-event'
+import { getSettingValue } from './evalops/settings'
 
 let mainWindow: BrowserWindow | null = null
 let overlayPanel: BrowserWindow | null = null
@@ -284,9 +284,7 @@ app.on('will-quit', () => {
 
 function getSetting(key: string): unknown {
   try {
-    const db = getDatabase()
-    const row = db.select().from(schema.settings).where(eq(schema.settings.key, key)).get()
-    return row ? JSON.parse(row.value) : null
+    return getSettingValue(key)
   } catch {
     return null
   }
