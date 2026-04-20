@@ -4,6 +4,7 @@ import {
   getEvalOpsServicesStatus,
   ingestEvalOpsSpans,
   listEvalOpsAgents,
+  listEvalOpsApprovals,
   listEvalOpsSkills,
   listEvalOpsTraces,
   recallEvalOpsMemory,
@@ -12,6 +13,7 @@ import {
 } from './services'
 import type {
   EvalOpsIngestSpansRequest,
+  EvalOpsListApprovalsRequest,
   EvalOpsListAgentsRequest,
   EvalOpsListSkillsRequest,
   EvalOpsListTracesRequest,
@@ -43,6 +45,9 @@ export function registerEvalOpsHandlers(): void {
   })
   ipcMain.handle('evalops:memory:store', async (_event, request: EvalOpsStoreMemoryRequest) => {
     return storeEvalOpsMemory(request)
+  })
+  ipcMain.handle('evalops:approvals:list', async (_event, request?: EvalOpsListApprovalsRequest) => {
+    return listEvalOpsApprovals(request)
   })
   ipcMain.handle('evalops:traces:list', async (_event, request?: EvalOpsListTracesRequest) => {
     return listEvalOpsTraces(request)

@@ -294,7 +294,7 @@ export function EvalOpsSettings() {
             <div>
               <h4 className="text-sm font-medium mb-1">Platform Services</h4>
               <p className="text-xs text-muted-foreground">
-                Agent registry, skills, memory, and traces are checked through the unified EvalOps platform API.
+                Agent registry, skills, memory, approvals, and traces are checked through the unified EvalOps platform API.
               </p>
             </div>
             <button

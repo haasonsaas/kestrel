@@ -28,6 +28,7 @@ import { registerMCPHandlers } from './mcp/handlers'
 import { registerEvalOpsHandlers } from './evalops/handlers'
 import { registerUpdateHandlers } from './updates'
 import { registerKeyboardShortcutHandlers, unregisterKeyboardShortcuts } from './shortcuts'
+import { registerPlatformNotificationHandlers, unregisterPlatformNotificationHandlers } from './platform-notifications'
 import { shouldExcludeContext } from './privacy/rules'
 import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wide-event'
 
@@ -103,6 +104,7 @@ app.whenReady().then(async () => {
   overlayPanel = createOverlayPanel()
   meetingStatusPanel = createMeetingStatusPanel()
   hummingbirdWindow = createHummingbirdWindow()
+  registerPlatformNotificationHandlers({ getMainWindow: () => mainWindow })
 
   // ── System tray ──────────────────────────────────────
   setupTray()
@@ -236,6 +238,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   unregisterKeyboardShortcuts()
+  unregisterPlatformNotificationHandlers()
   contextKit?.shutdown()
   mcpManager.stopAll()
   tray?.destroy()

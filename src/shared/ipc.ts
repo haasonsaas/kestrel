@@ -17,6 +17,7 @@ export type IpcChannels = {
   'evalops:skills:search': { args: [request: EvalOpsSearchSkillsRequest]; return: EvalOpsListSkillsResponse }
   'evalops:memory:recall': { args: [request: EvalOpsRecallMemoryRequest]; return: EvalOpsRecallMemoryResponse }
   'evalops:memory:store': { args: [request: EvalOpsStoreMemoryRequest]; return: EvalOpsStoreMemoryResponse }
+  'evalops:approvals:list': { args: [request?: EvalOpsListApprovalsRequest]; return: EvalOpsListApprovalsResponse }
   'evalops:traces:list': { args: [request?: EvalOpsListTracesRequest]; return: EvalOpsListTracesResponse }
   'evalops:traces:ingest': { args: [request: EvalOpsIngestSpansRequest]; return: EvalOpsIngestSpansResponse }
 
@@ -91,6 +92,11 @@ export type IpcChannels = {
   'app:checkForUpdates': { args: []; return: UpdateStatus }
   'app:installUpdate': { args: []; return: boolean }
 
+  // Platform notifications
+  'platformNotifications:list': { args: []; return: PlatformNotificationEvent[] }
+  'platformNotifications:refresh': { args: []; return: PlatformNotificationEvent[] }
+  'platformNotifications:test': { args: []; return: PlatformNotificationEvent }
+
   // Keyboard shortcuts
   'shortcuts:list': { args: []; return: KeyboardShortcut[] }
   'shortcuts:update': { args: [updates: Array<{ id: KeyboardShortcutId; accelerator: string }>]; return: KeyboardShortcut[] }
@@ -115,6 +121,7 @@ export type IpcEvents = {
   'hummingbird:voiceTranscript': { text: string }
   'hummingbird:voiceRecording': { recording: boolean }
   'app:updateStatusChanged': UpdateStatus
+  'platformNotification:received': PlatformNotificationEvent
 }
 
 // Data types
@@ -250,7 +257,7 @@ export interface EvalOpsAuthStatus {
 }
 
 export interface EvalOpsServiceStatus {
-  service: 'agent-registry' | 'skills' | 'memory' | 'traces'
+  service: 'agent-registry' | 'skills' | 'memory' | 'approvals' | 'traces'
   ok: boolean
   baseUrl: string
   error?: string
@@ -371,6 +378,33 @@ export interface EvalOpsStoreMemoryResponse {
   memory?: EvalOpsMemory
 }
 
+export interface EvalOpsApprovalRequest {
+  id?: string
+  workspaceId?: string
+  approverUserId?: string
+  agentId?: string
+  surface?: string
+  actionType?: string
+  actionPayload?: string
+  riskLevel?: string
+  contextJson?: string
+  createdAt?: string
+  updatedAt?: string
+  state?: string
+  expiresAt?: string
+}
+
+export interface EvalOpsListApprovalsRequest {
+  workspaceId?: string
+  limit?: number
+  offset?: number
+}
+
+export interface EvalOpsListApprovalsResponse {
+  requests: EvalOpsApprovalRequest[]
+  total?: number
+}
+
 export interface EvalOpsTraceSpan {
   traceId: string
   spanId: string
@@ -416,6 +450,19 @@ export interface EvalOpsListTracesResponse {
   traces: unknown[]
   total?: number
   hasMore?: boolean
+}
+
+export type PlatformNotificationKind = 'agent-completion' | 'approval-request' | 'trace-alert'
+
+export interface PlatformNotificationEvent {
+  id: string
+  kind: PlatformNotificationKind
+  title: string
+  body: string
+  deepLink?: string
+  sourceId?: string
+  createdAt: number
+  read: boolean
 }
 
 export interface AppContext {

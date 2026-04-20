@@ -5,6 +5,8 @@ import { getStoredEvalOpsSession } from './auth'
 import type {
   EvalOpsIngestSpansRequest,
   EvalOpsIngestSpansResponse,
+  EvalOpsListApprovalsRequest,
+  EvalOpsListApprovalsResponse,
   EvalOpsListAgentsRequest,
   EvalOpsListAgentsResponse,
   EvalOpsListSkillsRequest,
@@ -98,6 +100,16 @@ export async function storeEvalOpsMemory(request: EvalOpsStoreMemoryRequest): Pr
   })
 }
 
+export async function listEvalOpsApprovals(request: EvalOpsListApprovalsRequest = {}): Promise<EvalOpsListApprovalsResponse> {
+  const config = getEvalOpsConfig()
+  const client = await getEvalOpsConsumerClient()
+  return client.approvals.listPending({
+    workspaceId: request.workspaceId ?? config.workspaceId,
+    limit: request.limit ?? 50,
+    offset: request.offset ?? 0
+  })
+}
+
 export async function listEvalOpsTraces(request: EvalOpsListTracesRequest = {}): Promise<EvalOpsListTracesResponse> {
   const config = getEvalOpsConfig()
   const client = await getEvalOpsConsumerClient()
@@ -127,6 +139,7 @@ export async function getEvalOpsServicesStatus(): Promise<EvalOpsServiceStatus[]
     { service: 'agent-registry', baseUrl: config.baseUrl, run: () => listEvalOpsAgents({ limit: 1 }) },
     { service: 'skills', baseUrl: config.baseUrl, run: () => listEvalOpsSkills({ limit: 1 }) },
     { service: 'memory', baseUrl: config.baseUrl, run: () => recallEvalOpsMemory({ query: 'kestrel', topK: 1 }) },
+    { service: 'approvals', baseUrl: config.baseUrl, run: () => listEvalOpsApprovals({ limit: 1 }) },
     { service: 'traces', baseUrl: config.baseUrl, run: () => listEvalOpsTraces({ limit: 1 }) }
   ]
 
