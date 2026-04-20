@@ -31,6 +31,7 @@ export type EventType =
   | 'mcp_server_stop'
   | 'journal_generate'
   | 'arena_run'
+  | 'llm_usage'
   | 'overlay_message'
   | 'app_start'
   | 'app_quit'
