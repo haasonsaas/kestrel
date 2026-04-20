@@ -84,6 +84,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "evalops",
+        "repo": "kestrel"
+      }
+    ],
     "files": [
       "out/**/*"
     ],
