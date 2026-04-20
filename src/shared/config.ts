@@ -26,6 +26,7 @@ export const APP_VERSION = '0.6.0'
 // ── EvalOps Platform Defaults ──
 
 export const EVALOPS_DEFAULT_IDENTITY_BASE_URL = 'http://identity-service.evalops.svc.cluster.local:8080'
+export const EVALOPS_DEFAULT_BASE_URL = 'https://api.evalops.dev'
 export const EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL = 'http://llm-gateway-service.evalops.svc.cluster.local:8080/v1'
 export const EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL = 'http://agent-registry-service.evalops.svc.cluster.local:8080'
 export const EVALOPS_DEFAULT_SKILLS_BASE_URL = 'http://skills-service.evalops.svc.cluster.local:8080'
