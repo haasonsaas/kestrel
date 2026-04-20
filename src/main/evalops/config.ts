@@ -20,6 +20,7 @@ export const EVALOPS_AUTH_SESSION_KEY = 'evalops_auth_session'
 export interface EvalOpsConfig {
   identityBaseUrl: string
   baseUrl: string
+  token?: string
   llmGatewayBaseUrl: string
   agentRegistryBaseUrl: string
   skillsBaseUrl: string
@@ -42,6 +43,7 @@ export interface EvalOpsProviderRef {
 interface StoredEvalOpsConfig {
   identityBaseUrl?: unknown
   baseUrl?: unknown
+  token?: unknown
   llmGatewayBaseUrl?: unknown
   agentRegistryBaseUrl?: unknown
   skillsBaseUrl?: unknown
@@ -72,6 +74,10 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
       process.env.EVALOPS_BASE_URL,
       asString(stored.baseUrl),
       EVALOPS_DEFAULT_BASE_URL
+    ),
+    token: cleanOptionalString(
+      process.env.EVALOPS_TOKEN,
+      asString(stored.token)
     ),
     llmGatewayBaseUrl,
     agentRegistryBaseUrl: cleanUrl(
@@ -137,6 +143,14 @@ function cleanString(...values: Array<string | null | undefined>): string {
     if (trimmed) return trimmed
   }
   return ''
+}
+
+function cleanOptionalString(...values: Array<string | null | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim()
+    if (trimmed) return trimmed
+  }
+  return undefined
 }
 
 function asString(value: unknown): string | undefined {

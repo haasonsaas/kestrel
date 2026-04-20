@@ -2,20 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Check, LogIn, LogOut, RefreshCw, Save } from 'lucide-react'
 import {
   EVALOPS_DEFAULT_AGENT_ID,
-  EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
+  EVALOPS_DEFAULT_BASE_URL,
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
-  EVALOPS_DEFAULT_MEMORY_BASE_URL,
   EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
-  EVALOPS_DEFAULT_SKILLS_BASE_URL,
-  EVALOPS_DEFAULT_TRACES_BASE_URL,
   EVALOPS_DEFAULT_WORKSPACE_ID
 } from '@shared/config'
 import type { EvalOpsAuthStatus, EvalOpsServiceStatus } from '@shared/ipc'
 
 interface StoredEvalOpsConfig {
   identityBaseUrl?: string
+  baseUrl?: string
+  token?: string
   resource?: string
   scopes?: string[]
   agentRegistryBaseUrl?: string
@@ -35,12 +34,10 @@ interface StoredEvalOpsConfig {
 export function EvalOpsSettings() {
   const [status, setStatus] = useState<EvalOpsAuthStatus | null>(null)
   const [identityBaseUrl, setIdentityBaseUrl] = useState(EVALOPS_DEFAULT_IDENTITY_BASE_URL)
+  const [baseUrl, setBaseUrl] = useState(EVALOPS_DEFAULT_BASE_URL)
+  const [token, setToken] = useState('')
   const [resource, setResource] = useState(EVALOPS_DEFAULT_RESOURCE)
   const [scopes, setScopes] = useState(EVALOPS_DEFAULT_SCOPES.join(' '))
-  const [agentRegistryBaseUrl, setAgentRegistryBaseUrl] = useState(EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL)
-  const [skillsBaseUrl, setSkillsBaseUrl] = useState(EVALOPS_DEFAULT_SKILLS_BASE_URL)
-  const [memoryBaseUrl, setMemoryBaseUrl] = useState(EVALOPS_DEFAULT_MEMORY_BASE_URL)
-  const [tracesBaseUrl, setTracesBaseUrl] = useState(EVALOPS_DEFAULT_TRACES_BASE_URL)
   const [workspaceId, setWorkspaceId] = useState(EVALOPS_DEFAULT_WORKSPACE_ID)
   const [agentId, setAgentId] = useState(EVALOPS_DEFAULT_AGENT_ID)
   const [provider, setProvider] = useState(EVALOPS_DEFAULT_PROVIDER_REF.provider)
@@ -53,16 +50,15 @@ export function EvalOpsSettings() {
   const [error, setError] = useState<string | null>(null)
 
   const parsedScopes = useMemo(() => parseScopes(scopes), [scopes])
+  const tokenConfigured = Boolean(token.trim()) || Boolean(status?.tokenConfigured)
 
   const load = useCallback(async () => {
     const stored = await window.api.invoke('settings:get', 'evalops_config') as StoredEvalOpsConfig | null
     if (stored?.identityBaseUrl) setIdentityBaseUrl(stored.identityBaseUrl)
+    if (stored?.baseUrl) setBaseUrl(stored.baseUrl)
+    if (stored?.token) setToken(stored.token)
     if (stored?.resource) setResource(stored.resource)
     if (stored?.scopes?.length) setScopes(stored.scopes.join(' '))
-    if (stored?.agentRegistryBaseUrl) setAgentRegistryBaseUrl(stored.agentRegistryBaseUrl)
-    if (stored?.skillsBaseUrl) setSkillsBaseUrl(stored.skillsBaseUrl)
-    if (stored?.memoryBaseUrl) setMemoryBaseUrl(stored.memoryBaseUrl)
-    if (stored?.tracesBaseUrl) setTracesBaseUrl(stored.tracesBaseUrl)
     if (stored?.workspaceId) setWorkspaceId(stored.workspaceId)
     if (stored?.agentId) setAgentId(stored.agentId)
     if (stored?.providerRef?.provider) setProvider(stored.providerRef.provider)
@@ -82,12 +78,10 @@ export function EvalOpsSettings() {
     try {
       await window.api.invoke('settings:set', 'evalops_config', {
         identityBaseUrl: identityBaseUrl.trim(),
+        baseUrl: baseUrl.trim(),
+        token: token.trim(),
         resource: resource.trim(),
         scopes: parsedScopes,
-        agentRegistryBaseUrl: agentRegistryBaseUrl.trim(),
-        skillsBaseUrl: skillsBaseUrl.trim(),
-        memoryBaseUrl: memoryBaseUrl.trim(),
-        tracesBaseUrl: tracesBaseUrl.trim(),
         workspaceId: workspaceId.trim(),
         agentId: agentId.trim(),
         providerRef: {
@@ -105,7 +99,7 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [agentId, agentRegistryBaseUrl, identityBaseUrl, memoryBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, skillsBaseUrl, tracesBaseUrl, workspaceId])
+  }, [agentId, baseUrl, identityBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, scopes, token, workspaceId])
 
   const signIn = useCallback(async () => {
     setBusy(true)
@@ -176,7 +170,9 @@ export function EvalOpsSettings() {
             <p className="text-xs text-muted-foreground">
               {status?.authenticated
                 ? `Signed in${status.organizationId ? ` to ${status.organizationId}` : ''}.`
-                : 'Not signed in.'}
+                : tokenConfigured
+                  ? 'Using manually configured bearer token.'
+                  : 'Not signed in.'}
             </p>
             {status?.expiresAt && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -214,6 +210,21 @@ export function EvalOpsSettings() {
             )}
           </div>
         </div>
+
+        <TextSetting
+          label="Platform Base URL"
+          value={baseUrl}
+          onChange={setBaseUrl}
+          placeholder={EVALOPS_DEFAULT_BASE_URL}
+        />
+
+        <TextSetting
+          label="Bearer Token"
+          value={token}
+          onChange={setToken}
+          placeholder="Use OIDC sign-in or paste a service token"
+          type="password"
+        />
 
         <TextSetting
           label="Identity Base URL"
@@ -283,43 +294,18 @@ export function EvalOpsSettings() {
             <div>
               <h4 className="text-sm font-medium mb-1">Platform Services</h4>
               <p className="text-xs text-muted-foreground">
-                Connect-RPC endpoints for agent registry, skills, memory, and traces.
+                Agent registry, skills, memory, and traces are checked through the unified EvalOps platform API.
               </p>
             </div>
             <button
               onClick={checkServices}
-              disabled={busy || !status?.authenticated}
+              disabled={busy || (!status?.authenticated && !tokenConfigured)}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
               Check
             </button>
           </div>
-
-          <TextSetting
-            label="Agent Registry URL"
-            value={agentRegistryBaseUrl}
-            onChange={setAgentRegistryBaseUrl}
-            placeholder={EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL}
-          />
-          <TextSetting
-            label="Skills URL"
-            value={skillsBaseUrl}
-            onChange={setSkillsBaseUrl}
-            placeholder={EVALOPS_DEFAULT_SKILLS_BASE_URL}
-          />
-          <TextSetting
-            label="Memory URL"
-            value={memoryBaseUrl}
-            onChange={setMemoryBaseUrl}
-            placeholder={EVALOPS_DEFAULT_MEMORY_BASE_URL}
-          />
-          <TextSetting
-            label="Traces URL"
-            value={tracesBaseUrl}
-            onChange={setTracesBaseUrl}
-            placeholder={EVALOPS_DEFAULT_TRACES_BASE_URL}
-          />
 
           {serviceStatuses.length > 0 && (
             <div className="space-y-2">
@@ -372,17 +358,20 @@ function TextSetting({
   label,
   value,
   onChange,
-  placeholder
+  placeholder,
+  type = 'text'
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   placeholder: string
+  type?: string
 }) {
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium">{label}</label>
       <input
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
