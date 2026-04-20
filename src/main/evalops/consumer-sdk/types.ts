@@ -147,6 +147,35 @@ export interface MemoryStoreResponse extends JsonObject {
   memory?: MemoryRecord
 }
 
+export interface ApprovalRequestRecord extends JsonObject {
+  id?: string
+  workspaceId?: string
+  approverUserId?: string
+  agentId?: string
+  surface?: string
+  actionType?: string
+  actionPayload?: string
+  riskLevel?: string
+  contextJson?: string
+  createdAt?: string
+  updatedAt?: string
+  state?: string
+  expiresAt?: string
+}
+
+export interface ApprovalListPendingRequest extends JsonObject {
+  workspaceId?: string
+  limit?: number
+  offset?: number
+}
+
+export interface ApprovalListPendingResponse extends JsonObject {
+  requests: ApprovalRequestRecord[]
+  total?: number
+  offline?: boolean
+  reason?: string
+}
+
 export interface TraceSpan extends JsonObject {
   traceId: string
   spanId: string

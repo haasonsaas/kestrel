@@ -1,5 +1,6 @@
 import {
   AgentRegistryClient,
+  ApprovalsClient,
   ConnectorsClient,
   MemoryClient,
   MeterClient,
@@ -12,6 +13,7 @@ import type { EvalOpsClientConfig, EvalOpsClientMetrics } from './types'
 export class EvalOpsClient {
   readonly meter: MeterClient
   readonly memory: MemoryClient
+  readonly approvals: ApprovalsClient
   readonly traces: TracesClient
   readonly agentRegistry: AgentRegistryClient
   readonly skills: SkillsClient
@@ -23,6 +25,7 @@ export class EvalOpsClient {
     this.transport = new EvalOpsTransport(config)
     this.meter = new MeterClient(this.transport)
     this.memory = new MemoryClient(this.transport)
+    this.approvals = new ApprovalsClient(this.transport)
     this.traces = new TracesClient(this.transport)
     this.agentRegistry = new AgentRegistryClient(this.transport)
     this.skills = new SkillsClient(this.transport)

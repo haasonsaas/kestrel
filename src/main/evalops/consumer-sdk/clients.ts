@@ -3,6 +3,8 @@ import type {
   AgentRegistryListRequest,
   AgentRegistryListResponse,
   AgentRegistryRecord,
+  ApprovalListPendingRequest,
+  ApprovalListPendingResponse,
   IngestSpansRequest,
   IngestSpansResponse,
   JsonObject,
@@ -73,6 +75,24 @@ export class MemoryClient {
       body: memory,
       signal: options?.signal,
       fallback: (reason) => ({ ...offline(reason) })
+    })
+  }
+}
+
+export class ApprovalsClient {
+  constructor(private readonly transport: EvalOpsTransport) {}
+
+  listPending(
+    request: ApprovalListPendingRequest = {},
+    options?: { signal?: AbortSignal }
+  ): Promise<ApprovalListPendingResponse> {
+    return this.transport.request({
+      service: 'approvals',
+      operation: 'listPending',
+      path: '/approvals.v1.ApprovalService/ListPending',
+      body: request,
+      signal: options?.signal,
+      fallback: (reason) => ({ requests: [], total: 0, ...offline(reason) })
     })
   }
 }
