@@ -9,6 +9,7 @@ import { ArenaPage } from './routes/arena/ArenaPage'
 import { SettingsPage } from './routes/settings/SettingsPage'
 import { chatStore } from './stores/chatStore'
 import type { AppDeepLinkTarget, AppDeepLinkSettingsTab } from '@shared/ipc'
+import { CommandPalette } from './components/CommandPalette'
 import './styles/globals.css'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
     tab: 'general',
     version: 0
   })
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -29,6 +31,16 @@ function App() {
   const handleNewChat = useCallback(() => {
     setActiveNav('chat')
     chatStore.createThread()
+  }, [])
+
+  const handleNavigate = useCallback((item: NavItem, settingsTab?: AppDeepLinkSettingsTab) => {
+    if (item === 'settings' && settingsTab) {
+      setSettingsTabRequest((current) => ({
+        tab: settingsTab,
+        version: current.version + 1
+      }))
+    }
+    setActiveNav(item)
   }, [])
 
   const handleDeepLink = useCallback((target: AppDeepLinkTarget) => {
@@ -48,6 +60,24 @@ function App() {
     })
     return unsubscribe
   }, [handleDeepLink])
+
+  useEffect(() => {
+    const unsubscribe = window.api.on('app:openCommandPalette', () => {
+      setCommandPaletteOpen(true)
+    })
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCommandPaletteOpen((current) => !current)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Loading state
   if (showOnboarding === null) return null
@@ -73,13 +103,22 @@ function App() {
   }
 
   return (
-    <MainLayout
-      activeItem={activeNav}
-      onNavigate={setActiveNav}
-      onNewChat={handleNewChat}
-    >
-      {renderPage()}
-    </MainLayout>
+    <>
+      <MainLayout
+        activeItem={activeNav}
+        onNavigate={handleNavigate}
+        onNewChat={handleNewChat}
+      >
+        {renderPage()}
+      </MainLayout>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        onNavigate={handleNavigate}
+        onDeepLink={handleDeepLink}
+        onNewChat={handleNewChat}
+      />
+    </>
   )
 }
 

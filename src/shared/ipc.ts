@@ -119,6 +119,7 @@ export type IpcEvents = {
   'meeting:transcriptChunk': { meetingId: string; text: string }
   'mcp:statusUpdate': MCPServerStatus[]
   'app:newChat': Record<string, never>
+  'app:openCommandPalette': Record<string, never>
   'hummingbird:voiceMode': { active: boolean }
   'hummingbird:voiceTranscript': { text: string }
   'hummingbird:voiceRecording': { recording: boolean }
@@ -240,7 +241,7 @@ export interface AppDeepLinkTarget {
   params: Record<string, string>
 }
 
-export type KeyboardShortcutId = 'toggleQuickAccess' | 'newChat' | 'toggleRecording'
+export type KeyboardShortcutId = 'toggleQuickAccess' | 'newChat' | 'openCommandPalette' | 'toggleRecording'
 
 export interface KeyboardShortcut {
   id: KeyboardShortcutId
