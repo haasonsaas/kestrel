@@ -1,0 +1,17 @@
+[package]
+name = "kestrel-sdk"
+version = "0.1.0"
+description = "Rust SDK foundation for Kestrel and EvalOps desktop integrations."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["evalops", "kestrel", "sdk", "desktop"]
+categories = ["api-bindings"]
+include = ["src/**/*.rs", "Cargo.toml", "README.md"]
+publish = true
+
+[lib]
+name = "kestrel_sdk"
+path = "src/lib.rs"

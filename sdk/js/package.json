@@ -1,0 +1,44 @@
+{
+  "name": "@evalops/kestrel-sdk",
+  "version": "0.1.0",
+  "description": "JavaScript SDK foundation for Kestrel and EvalOps desktop integrations.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pack:dry": "npm pack --dry-run",
+    "publish:npm": "npm publish --access public",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "evalops",
+    "kestrel",
+    "sdk",
+    "desktop"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evalops/kestrel.git",
+    "directory": "sdk/js"
+  },
+  "bugs": {
+    "url": "https://github.com/evalops/kestrel/issues"
+  },
+  "homepage": "https://github.com/evalops/kestrel#readme",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

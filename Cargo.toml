@@ -1,0 +1,9 @@
+[workspace]
+members = ["sdk/rust/kestrel-sdk"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/evalops/kestrel"
+homepage = "https://github.com/evalops/kestrel"

@@ -10,6 +10,7 @@ _reference/
 
 # Native builds
 native/contextkit/.build/
+target/
 
 # Environment
 .env
