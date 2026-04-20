@@ -1,4 +1,4 @@
-import { getEvalOpsAccessToken, getStoredEvalOpsSession } from '../evalops/auth'
+import { getEvalOpsBearerToken, getStoredEvalOpsSession } from '../evalops/auth'
 import { getEvalOpsConfig, type EvalOpsProviderRef } from '../evalops/config'
 
 export interface ChatMessage {
@@ -181,7 +181,7 @@ export async function chatCompletionStream(
 }
 
 async function getGatewayRequestConfig(): Promise<GatewayRequestConfig> {
-  const token = await getEvalOpsAccessToken()
+  const token = await getEvalOpsBearerToken()
   const config = getEvalOpsConfig()
   const session = getStoredEvalOpsSession()
   const headers: Record<string, string> = {

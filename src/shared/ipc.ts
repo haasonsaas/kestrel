@@ -229,6 +229,7 @@ export interface EvalOpsAuthStatus {
   scopes: string[]
   expiresAt?: number
   refreshExpiresAt?: string
+  tokenConfigured?: boolean
 }
 
 export interface EvalOpsServiceStatus {

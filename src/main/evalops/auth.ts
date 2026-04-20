@@ -69,13 +69,15 @@ interface OAuthCallbackResult {
 export async function getEvalOpsAuthStatus(): Promise<EvalOpsAuthStatus> {
   const config = getEvalOpsConfig()
   const session = await getFreshSession().catch(() => getStoredSession())
+  const tokenConfigured = Boolean(config.token)
 
   if (!session) {
     return {
       authenticated: false,
       identityBaseUrl: config.identityBaseUrl,
       resource: config.resource,
-      scopes: config.scopes
+      scopes: config.scopes,
+      tokenConfigured
     }
   }
 
@@ -86,7 +88,8 @@ export async function getEvalOpsAuthStatus(): Promise<EvalOpsAuthStatus> {
     organizationId: session.organizationId,
     scopes: session.scopes,
     expiresAt: session.expiresAt,
-    refreshExpiresAt: session.refreshExpiresAt
+    refreshExpiresAt: session.refreshExpiresAt,
+    tokenConfigured
   }
 }
 
@@ -166,6 +169,12 @@ export async function getEvalOpsAccessToken(minValidityMs = 60_000): Promise<str
     throw new Error('EvalOps authentication required. Sign in from Settings > EvalOps.')
   }
   return session.accessToken
+}
+
+export async function getEvalOpsBearerToken(minValidityMs = 60_000): Promise<string> {
+  const token = getEvalOpsConfig().token
+  if (token) return token
+  return getEvalOpsAccessToken(minValidityMs)
 }
 
 export function getStoredEvalOpsSession(): StoredAuthSession | null {

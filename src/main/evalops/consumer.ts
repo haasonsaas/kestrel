@@ -1,10 +1,10 @@
-import { getEvalOpsAccessToken, getStoredEvalOpsSession } from './auth'
+import { getEvalOpsBearerToken, getStoredEvalOpsSession } from './auth'
 import { getEvalOpsConfig } from './config'
 import { EvalOpsClient } from './consumer-sdk'
 
 export async function getEvalOpsConsumerClient(): Promise<EvalOpsClient> {
   const config = getEvalOpsConfig()
-  const token = await getEvalOpsAccessToken()
+  const token = await getEvalOpsBearerToken()
   const session = getStoredEvalOpsSession()
   return new EvalOpsClient({
     baseUrl: config.baseUrl,
