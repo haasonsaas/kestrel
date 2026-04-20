@@ -90,6 +90,11 @@ export type IpcChannels = {
   'app:updateStatus': { args: []; return: UpdateStatus }
   'app:checkForUpdates': { args: []; return: UpdateStatus }
   'app:installUpdate': { args: []; return: boolean }
+
+  // Keyboard shortcuts
+  'shortcuts:list': { args: []; return: KeyboardShortcut[] }
+  'shortcuts:update': { args: [updates: Array<{ id: KeyboardShortcutId; accelerator: string }>]; return: KeyboardShortcut[] }
+  'shortcuts:reset': { args: []; return: KeyboardShortcut[] }
 }
 
 // Push events (main → renderer)
@@ -210,6 +215,18 @@ export interface UpdateStatus {
     releaseNotes?: string | Array<{ version?: string; note?: string }>
     releaseDate?: string
   }
+}
+
+export type KeyboardShortcutId = 'toggleQuickAccess' | 'newChat' | 'toggleRecording'
+
+export interface KeyboardShortcut {
+  id: KeyboardShortcutId
+  label: string
+  description: string
+  defaultAccelerator: string
+  accelerator: string
+  registered: boolean
+  error?: string
 }
 
 export interface EvalOpsLoginOptions {

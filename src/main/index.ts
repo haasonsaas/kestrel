@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { v4 as uuid } from 'uuid'
 import { eq } from 'drizzle-orm'
@@ -27,6 +27,7 @@ import { MCPServerManager } from './mcp/manager'
 import { registerMCPHandlers } from './mcp/handlers'
 import { registerEvalOpsHandlers } from './evalops/handlers'
 import { registerUpdateHandlers } from './updates'
+import { registerKeyboardShortcutHandlers, unregisterKeyboardShortcuts } from './shortcuts'
 import { shouldExcludeContext } from './privacy/rules'
 import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wide-event'
 
@@ -119,30 +120,7 @@ app.whenReady().then(async () => {
   setupModifierTapMonitor()
 
   // ── Global keyboard shortcuts ────────────────────────
-
-  // Cmd+Shift+Space: Toggle overlay (legacy, kept as fallback)
-  globalShortcut.register('CommandOrControl+Shift+Space', () => {
-    if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
-  })
-
-  // Cmd+N: Create new chat thread and focus main window
-  globalShortcut.register('CommandOrControl+N', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show()
-      mainWindow.focus()
-      mainWindow.webContents.send('app:newChat', {})
-    }
-  })
-
-  // Cmd+Shift+R: Toggle meeting recording
-  globalShortcut.register('CommandOrControl+Shift+R', async () => {
-    if (isRecording()) {
-      const meetingId = getActiveMeetingId()
-      if (meetingId) await stopMeetingRecording(meetingId)
-    } else {
-      await startMeetingRecording('Meeting', 'Manual Recording')
-    }
-  })
+  setupKeyboardShortcuts()
 
   // ── Window control IPC ───────────────────────────────
   ipcMain.handle('window:toggleOverlay', () => {
@@ -257,7 +235,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
+  unregisterKeyboardShortcuts()
   contextKit?.shutdown()
   mcpManager.stopAll()
   tray?.destroy()
@@ -282,6 +260,47 @@ function sendToAllRenderers(channel: string, data: unknown): void {
       win.webContents.send(channel, data)
     }
   }
+}
+
+function setupKeyboardShortcuts(): void {
+  registerKeyboardShortcutHandlers([
+    {
+      id: 'toggleQuickAccess',
+      label: 'Toggle Quick Access Panel',
+      description: 'Show or hide the Hummingbird quick chat window.',
+      defaultAccelerator: 'CommandOrControl+Shift+Space',
+      run: () => {
+        if (hummingbirdWindow) toggleHummingbird(hummingbirdWindow)
+      }
+    },
+    {
+      id: 'newChat',
+      label: 'New Chat',
+      description: 'Open Kestrel and start a new chat thread.',
+      defaultAccelerator: 'CommandOrControl+N',
+      run: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+          mainWindow.webContents.send('app:newChat', {})
+        }
+      }
+    },
+    {
+      id: 'toggleRecording',
+      label: 'Toggle Recording',
+      description: 'Start or stop a manual meeting recording.',
+      defaultAccelerator: 'CommandOrControl+Shift+R',
+      run: async () => {
+        if (isRecording()) {
+          const meetingId = getActiveMeetingId()
+          if (meetingId) await stopMeetingRecording(meetingId)
+        } else {
+          await startMeetingRecording('Meeting', 'Manual Recording')
+        }
+      }
+    }
+  ])
 }
 
 // ── Modifier-tap monitor setup ───────────────────────────
