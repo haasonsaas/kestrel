@@ -2,9 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Key, Check, Eye, EyeOff } from 'lucide-react'
 
 export function APIKeySettings() {
-  const [openrouterKey, setOpenrouterKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
-  const [showOpenrouter, setShowOpenrouter] = useState(false)
   const [showOpenai, setShowOpenai] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
 
@@ -13,9 +11,7 @@ export function APIKeySettings() {
   }, [])
 
   const loadKeys = async () => {
-    const or = await window.api.invoke('settings:get', 'openrouter_api_key')
     const oa = await window.api.invoke('settings:get', 'openai_api_key')
-    if (or) setOpenrouterKey(or as string)
     if (oa) setOpenaiKey(oa as string)
   }
 
@@ -29,22 +25,10 @@ export function APIKeySettings() {
     <div>
       <h3 className="text-xl font-semibold mb-2">API Keys</h3>
       <p className="text-sm text-muted-foreground mb-6">
-        Configure API keys for AI providers and services.
+        LLM requests use EvalOps LLM Gateway. A local OpenAI key is only used for Whisper transcription.
       </p>
 
       <div className="space-y-8">
-        <KeyInput
-          label="OpenRouter API Key"
-          value={openrouterKey}
-          onChange={setOpenrouterKey}
-          onSave={() => saveKey('openrouter_api_key', openrouterKey)}
-          show={showOpenrouter}
-          onToggleShow={() => setShowOpenrouter(!showOpenrouter)}
-          placeholder="sk-or-..."
-          description="Used for all AI model access. Get one at openrouter.ai"
-          isSaved={saved === 'openrouter_api_key'}
-        />
-
         <KeyInput
           label="OpenAI API Key"
           value={openaiKey}

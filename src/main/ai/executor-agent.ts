@@ -15,8 +15,8 @@
  * - Decide tone or style
  */
 
-import { chatCompletionStream } from './openrouter'
-import type { ChatMessage, ToolCall, OpenAITool } from './openrouter'
+import { chatCompletionStream } from './llm-gateway'
+import type { ChatMessage, ToolCall, OpenAITool } from './llm-gateway'
 import {
   buildContextPrompt,
   buildOpenAITools,

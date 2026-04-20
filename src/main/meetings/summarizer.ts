@@ -1,4 +1,4 @@
-import { chatCompletion } from '../ai/openrouter'
+import { chatCompletion } from '../ai/llm-gateway'
 import { INTERNAL_MODEL } from '../../shared/config'
 
 export async function summarizeMeeting(
