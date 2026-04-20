@@ -1,5 +1,6 @@
 import { getEvalOpsBearerToken, getStoredEvalOpsSession } from '../evalops/auth'
 import { getEvalOpsConfig, type EvalOpsProviderRef } from '../evalops/config'
+import { WideEvent, type Outcome } from '../observability/wide-event'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
@@ -39,30 +40,105 @@ interface GatewayRequestConfig {
   metadata: Record<string, unknown>
 }
 
+interface TokenUsage {
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  costUsd?: number
+}
+
+interface LlmUsageEventInput {
+  gateway: GatewayRequestConfig
+  model: string
+  resolvedModel?: string
+  messages: ChatMessage[]
+  tools?: OpenAITool[]
+  outputText: string
+  usage?: TokenUsage | null
+  latencyMs: number
+  stream: boolean
+  outcome: Outcome
+  error?: string
+  requestId?: string
+}
+
+const TOKENS_PER_CHAR_ESTIMATE = 0.25
+
+const MODEL_PRICING_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
+  'gpt-5.4': { input: 2.5, output: 15 },
+  'claude-sonnet-4.6': { input: 3, output: 15 },
+  'claude-opus-4.6': { input: 5, output: 25 },
+  'gemini-3.1-pro': { input: 2, output: 12 }
+}
+
 export async function chatCompletion(
   messages: ChatMessage[],
   model: string
 ): Promise<string> {
   const gateway = await getGatewayRequestConfig()
-  const response = await fetch(gateway.url, {
-    method: 'POST',
-    headers: gateway.headers,
-    body: JSON.stringify({
+  const startedAt = Date.now()
+
+  try {
+    const response = await fetch(gateway.url, {
+      method: 'POST',
+      headers: gateway.headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        provider_ref: gateway.providerRef,
+        metadata: gateway.metadata
+      })
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      const errorMessage = `EvalOps LLM Gateway error (${response.status}): ${err}`
+      emitLlmUsageEvent({
+        gateway,
+        model,
+        messages,
+        outputText: '',
+        latencyMs: Date.now() - startedAt,
+        stream: false,
+        outcome: 'error',
+        error: errorMessage
+      })
+      throw new Error(errorMessage)
+    }
+
+    const data = await response.json()
+    const outputText = data.choices?.[0]?.message?.content || ''
+    emitLlmUsageEvent({
+      gateway,
+      model,
+      resolvedModel: typeof data.model === 'string' ? data.model : undefined,
+      messages,
+      outputText,
+      usage: parseGatewayUsage(data.usage),
+      latencyMs: Date.now() - startedAt,
+      stream: false,
+      outcome: 'success',
+      requestId: typeof data.id === 'string' ? data.id : undefined
+    })
+    return outputText
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('EvalOps LLM Gateway error')) {
+      throw err
+    }
+
+    emitLlmUsageEvent({
+      gateway,
       model,
       messages,
+      outputText: '',
+      latencyMs: Date.now() - startedAt,
       stream: false,
-      provider_ref: gateway.providerRef,
-      metadata: gateway.metadata
+      outcome: 'error',
+      error: err instanceof Error ? err.message : String(err)
     })
-  })
-
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`EvalOps LLM Gateway error (${response.status}): ${err}`)
+    throw err
   }
-
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content || ''
 }
 
 /**
@@ -78,12 +154,40 @@ export async function chatCompletionStream(
   callbacks: StreamCallbacks,
   tools?: OpenAITool[]
 ): Promise<void> {
+  const startedAt = Date.now()
+  let gateway: GatewayRequestConfig | undefined
+  let usage: TokenUsage | null = null
+  let resolvedModel: string | undefined
+  let requestId: string | undefined
+  let fullText = ''
+  let usageEventEmitted = false
+
+  const emitUsageOnce = (outcome: Outcome, error?: string): void => {
+    if (usageEventEmitted || !gateway) return
+    usageEventEmitted = true
+    emitLlmUsageEvent({
+      gateway,
+      model,
+      resolvedModel,
+      messages,
+      tools,
+      outputText: fullText,
+      usage,
+      latencyMs: Date.now() - startedAt,
+      stream: true,
+      outcome,
+      error,
+      requestId
+    })
+  }
+
   try {
-    const gateway = await getGatewayRequestConfig()
+    gateway = await getGatewayRequestConfig()
     const body: Record<string, unknown> = {
       model,
       messages,
       stream: true,
+      stream_options: { include_usage: true },
       provider_ref: gateway.providerRef,
       metadata: gateway.metadata
     }
@@ -101,18 +205,20 @@ export async function chatCompletionStream(
 
     if (!response.ok) {
       const err = await response.text()
-      callbacks.onError(`EvalOps LLM Gateway error (${response.status}): ${err}`)
+      const errorMessage = `EvalOps LLM Gateway error (${response.status}): ${err}`
+      emitUsageOnce('error', errorMessage)
+      callbacks.onError(errorMessage)
       return
     }
 
     const reader = response.body?.getReader()
     if (!reader) {
+      emitUsageOnce('error', 'No response body')
       callbacks.onError('No response body')
       return
     }
 
     const decoder = new TextDecoder()
-    let fullText = ''
     let buffer = ''
 
     const toolCallAccumulator = new Map<number, {
@@ -135,12 +241,17 @@ export async function chatCompletionStream(
 
         const data = trimmed.slice(6)
         if (data === '[DONE]') {
+          emitUsageOnce('success')
           callbacks.onDone(fullText, buildToolCallsArray(toolCallAccumulator))
           return
         }
 
         try {
           const parsed = JSON.parse(data)
+          if (typeof parsed.id === 'string' && !requestId) requestId = parsed.id
+          if (typeof parsed.model === 'string') resolvedModel = parsed.model
+          usage = mergeGatewayUsage(usage, parseGatewayUsage(parsed.usage))
+
           const delta = parsed.choices?.[0]?.delta
 
           if (delta?.content) {
@@ -174,9 +285,12 @@ export async function chatCompletionStream(
       }
     }
 
+    emitUsageOnce('success')
     callbacks.onDone(fullText, buildToolCallsArray(toolCallAccumulator))
   } catch (err) {
-    callbacks.onError(err instanceof Error ? err.message : String(err))
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    emitUsageOnce('error', errorMessage)
+    callbacks.onError(errorMessage)
   }
 }
 
@@ -223,6 +337,110 @@ function buildToolCallsArray(
   return Array.from(accumulator.entries())
     .sort(([a], [b]) => a - b)
     .map(([, tc]) => tc)
+}
+
+function parseGatewayUsage(usage: unknown): TokenUsage | null {
+  if (!usage || typeof usage !== 'object') return null
+  const record = usage as Record<string, unknown>
+  return {
+    inputTokens: firstFiniteNumber(record.input_tokens, record.prompt_tokens),
+    outputTokens: firstFiniteNumber(record.output_tokens, record.completion_tokens),
+    totalTokens: firstFiniteNumber(record.total_tokens),
+    costUsd: firstFiniteNumber(record.total_cost_usd, record.cost_usd, record.total_cost, record.cost)
+  }
+}
+
+function mergeGatewayUsage(current: TokenUsage | null, next: TokenUsage | null): TokenUsage | null {
+  if (!current) return next
+  if (!next) return current
+  return {
+    inputTokens: next.inputTokens ?? current.inputTokens,
+    outputTokens: next.outputTokens ?? current.outputTokens,
+    totalTokens: next.totalTokens ?? current.totalTokens,
+    costUsd: next.costUsd ?? current.costUsd
+  }
+}
+
+function emitLlmUsageEvent(input: LlmUsageEventInput): void {
+  const resolvedModel = input.resolvedModel || input.model
+  const inputTokens = input.usage?.inputTokens ?? estimateInputTokens(input.messages, input.tools)
+  const outputTokens = input.usage?.outputTokens ?? estimateOutputTokens(input.outputText)
+  const totalTokens = input.usage?.totalTokens ?? inputTokens + outputTokens
+  const cost = input.usage?.costUsd != null
+    ? { amount: roundUsd(input.usage.costUsd), source: 'gateway' }
+    : estimateCostUsd(resolvedModel, inputTokens, outputTokens)
+  const provider = input.gateway.providerRef.provider || providerFromModel(resolvedModel)
+  const event = WideEvent.start('llm_usage', {
+    model: resolvedModel,
+    provider,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens,
+    latency_ms: input.latencyMs,
+    cost_estimate: cost.amount,
+    cost_estimate_source: cost.source,
+    usage_reported: Boolean(input.usage?.inputTokens != null || input.usage?.outputTokens != null),
+    stream: input.stream,
+    surface: stringField(input.gateway.metadata.surface),
+    agent_id: stringField(input.gateway.metadata.agent_id),
+    organization_id: stringField(input.gateway.metadata.organization_id),
+    workspace_id: stringField(input.gateway.metadata.workspace_id),
+    request_id: input.requestId ?? null
+  })
+
+  event.finish({ outcome: input.outcome, error: input.error })
+}
+
+function firstFiniteNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const numberValue = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
+    if (Number.isFinite(numberValue)) return numberValue
+  }
+  return undefined
+}
+
+function estimateInputTokens(messages: ChatMessage[], tools?: OpenAITool[]): number {
+  const messageText = messages.map((message) => {
+    const toolCalls = message.tool_calls?.map((toolCall) => `${toolCall.function.name}:${toolCall.function.arguments}`).join('\n') ?? ''
+    return [message.role, message.content ?? '', message.tool_call_id ?? '', toolCalls].join('\n')
+  }).join('\n')
+  const toolsText = tools?.map((tool) => `${tool.function.name}:${tool.function.description}:${JSON.stringify(tool.function.parameters)}`).join('\n') ?? ''
+  return estimateTokens(`${messageText}\n${toolsText}`)
+}
+
+function estimateOutputTokens(outputText: string): number {
+  return estimateTokens(outputText)
+}
+
+function estimateTokens(text: string): number {
+  if (!text) return 0
+  return Math.max(1, Math.ceil(text.length * TOKENS_PER_CHAR_ESTIMATE))
+}
+
+function estimateCostUsd(model: string, inputTokens: number, outputTokens: number): { amount: number; source: string } {
+  const pricing = MODEL_PRICING_USD_PER_MILLION[normalizeModelForPricing(model)]
+  if (!pricing) return { amount: 0, source: 'unpriced' }
+  return {
+    amount: roundUsd((inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000),
+    source: 'estimated'
+  }
+}
+
+function normalizeModelForPricing(model: string): string {
+  const withoutProvider = model.toLowerCase().trim().split('/').pop() || model.toLowerCase().trim()
+  return withoutProvider.replace(/-preview.*$/, '')
+}
+
+function providerFromModel(model: string): string {
+  return model.includes('/') ? model.split('/')[0] : 'evalops'
+}
+
+function roundUsd(value: number): number {
+  return Math.round(value * 1_000_000_000) / 1_000_000_000
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
 }
 
 // Models exposed through the EvalOps LLM Gateway. The gateway owns provider
