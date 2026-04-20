@@ -1,5 +1,6 @@
 import {
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
+  EVALOPS_DEFAULT_BASE_URL,
   EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL,
   EVALOPS_DEFAULT_AGENT_ID,
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
@@ -18,6 +19,7 @@ export const EVALOPS_AUTH_SESSION_KEY = 'evalops_auth_session'
 
 export interface EvalOpsConfig {
   identityBaseUrl: string
+  baseUrl: string
   llmGatewayBaseUrl: string
   agentRegistryBaseUrl: string
   skillsBaseUrl: string
@@ -39,6 +41,7 @@ export interface EvalOpsProviderRef {
 
 interface StoredEvalOpsConfig {
   identityBaseUrl?: unknown
+  baseUrl?: unknown
   llmGatewayBaseUrl?: unknown
   agentRegistryBaseUrl?: unknown
   skillsBaseUrl?: unknown
@@ -64,6 +67,11 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
       process.env.EVALOPS_IDENTITY_BASE_URL,
       asString(stored.identityBaseUrl),
       EVALOPS_DEFAULT_IDENTITY_BASE_URL
+    ),
+    baseUrl: cleanUrl(
+      process.env.EVALOPS_BASE_URL,
+      asString(stored.baseUrl),
+      EVALOPS_DEFAULT_BASE_URL
     ),
     llmGatewayBaseUrl,
     agentRegistryBaseUrl: cleanUrl(

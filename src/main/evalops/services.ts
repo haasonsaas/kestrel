@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import { getEvalOpsConfig } from './config'
-import { evalOpsUnary } from './connect'
+import { getEvalOpsConsumerClient } from './consumer'
 import { getStoredEvalOpsSession } from './auth'
 import type {
   EvalOpsIngestSpansRequest,
@@ -20,135 +20,101 @@ import type {
   EvalOpsTraceSpan
 } from '../../shared/ipc'
 
-const AGENT_SERVICE = 'agents.v1.AgentService'
-const SKILL_SERVICE = 'skills.v1.SkillService'
-const MEMORY_SERVICE = 'memory.v1.MemoryService'
-const TRACE_SERVICE = 'traces.v1.SpanIngestService'
-
 export async function listEvalOpsAgents(request: EvalOpsListAgentsRequest = {}): Promise<EvalOpsListAgentsResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsListAgentsResponse>({
-    baseUrl: config.agentRegistryBaseUrl,
-    service: AGENT_SERVICE,
-    method: 'List',
-    body: cleanRecord({
-      workspaceId: request.workspaceId ?? config.workspaceId,
-      agentType: request.agentType,
-      capability: request.capability,
-      surface: request.surface,
-      status: request.status,
-      limit: request.limit ?? 50,
-      offset: request.offset ?? 0
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.agentRegistry.list({
+    workspaceId: request.workspaceId ?? config.workspaceId,
+    agentType: request.agentType,
+    capability: request.capability,
+    surface: request.surface,
+    status: request.status,
+    limit: request.limit ?? 50,
+    offset: request.offset ?? 0
   })
 }
 
 export async function listEvalOpsSkills(request: EvalOpsListSkillsRequest = {}): Promise<EvalOpsListSkillsResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsListSkillsResponse>({
-    baseUrl: config.skillsBaseUrl,
-    service: SKILL_SERVICE,
-    method: 'List',
-    body: cleanRecord({
-      workspaceId: request.workspaceId ?? config.workspaceId,
-      scope: request.scope,
-      limit: request.limit ?? 50,
-      offset: request.offset ?? 0
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.skills.list({
+    workspaceId: request.workspaceId ?? config.workspaceId,
+    scope: request.scope,
+    limit: request.limit ?? 50,
+    offset: request.offset ?? 0
   })
 }
 
 export async function searchEvalOpsSkills(request: EvalOpsSearchSkillsRequest): Promise<EvalOpsListSkillsResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsListSkillsResponse>({
-    baseUrl: config.skillsBaseUrl,
-    service: SKILL_SERVICE,
-    method: 'Search',
-    body: cleanRecord({
-      workspaceId: request.workspaceId ?? config.workspaceId,
-      query: request.query,
-      scope: request.scope,
-      tags: request.tags,
-      limit: request.limit ?? 50,
-      offset: request.offset ?? 0
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.skills.search({
+    workspaceId: request.workspaceId ?? config.workspaceId,
+    query: request.query,
+    scope: request.scope,
+    tags: request.tags,
+    limit: request.limit ?? 50,
+    offset: request.offset ?? 0
   })
 }
 
 export async function recallEvalOpsMemory(request: EvalOpsRecallMemoryRequest): Promise<EvalOpsRecallMemoryResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsRecallMemoryResponse>({
-    baseUrl: config.memoryBaseUrl,
-    service: MEMORY_SERVICE,
-    method: 'Recall',
-    body: cleanRecord({
-      query: request.query,
-      scope: request.scope ?? 'SCOPE_USER',
-      topK: request.topK ?? 8,
-      minSimilarity: request.minSimilarity,
-      projectId: request.projectId,
-      teamId: request.teamId,
-      repository: request.repository,
-      agent: request.agent,
-      type: request.type,
-      agentId: request.agentId ?? config.agentId,
-      userId: request.userId,
-      reviewStatus: request.reviewStatus
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.memory.recall({
+    query: request.query,
+    scope: request.scope ?? 'SCOPE_USER',
+    topK: request.topK ?? 8,
+    minSimilarity: request.minSimilarity,
+    projectId: request.projectId,
+    teamId: request.teamId,
+    repository: request.repository,
+    agent: request.agent,
+    type: request.type,
+    agentId: request.agentId ?? config.agentId,
+    userId: request.userId,
+    reviewStatus: request.reviewStatus
   })
 }
 
 export async function storeEvalOpsMemory(request: EvalOpsStoreMemoryRequest): Promise<EvalOpsStoreMemoryResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsStoreMemoryResponse>({
-    baseUrl: config.memoryBaseUrl,
-    service: MEMORY_SERVICE,
-    method: 'Store',
-    body: cleanRecord({
-      scope: request.scope ?? 'SCOPE_USER',
-      content: request.content,
-      type: request.type,
-      source: request.source ?? 'kestrel',
-      confidence: request.confidence,
-      projectId: request.projectId,
-      teamId: request.teamId,
-      repository: request.repository,
-      agent: request.agent,
-      agentId: request.agentId ?? config.agentId,
-      userId: request.userId,
-      tags: request.tags,
-      pinned: request.pinned,
-      isPolicy: request.isPolicy
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.memory.store({
+    scope: request.scope ?? 'SCOPE_USER',
+    content: request.content,
+    type: request.type,
+    source: request.source ?? 'kestrel',
+    confidence: request.confidence,
+    projectId: request.projectId,
+    teamId: request.teamId,
+    repository: request.repository,
+    agent: request.agent,
+    agentId: request.agentId ?? config.agentId,
+    userId: request.userId,
+    tags: request.tags,
+    pinned: request.pinned,
+    isPolicy: request.isPolicy
   })
 }
 
 export async function listEvalOpsTraces(request: EvalOpsListTracesRequest = {}): Promise<EvalOpsListTracesResponse> {
   const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsListTracesResponse>({
-    baseUrl: config.tracesBaseUrl,
-    service: TRACE_SERVICE,
-    method: 'ListTraces',
-    body: cleanRecord({
-      workspaceId: request.workspaceId ?? config.workspaceId,
-      agentId: request.agentId,
-      surface: request.surface,
-      startTime: request.startTime,
-      endTime: request.endTime,
-      limit: request.limit ?? 50,
-      offset: request.offset ?? 0
-    })
+  const client = await getEvalOpsConsumerClient()
+  return client.traces.listTraces({
+    workspaceId: request.workspaceId ?? config.workspaceId,
+    agentId: request.agentId,
+    surface: request.surface,
+    startTime: request.startTime,
+    endTime: request.endTime,
+    limit: request.limit ?? 50,
+    offset: request.offset ?? 0
   })
 }
 
 export async function ingestEvalOpsSpans(request: EvalOpsIngestSpansRequest): Promise<EvalOpsIngestSpansResponse> {
-  const config = getEvalOpsConfig()
-  return evalOpsUnary<EvalOpsIngestSpansResponse>({
-    baseUrl: config.tracesBaseUrl,
-    service: TRACE_SERVICE,
-    method: 'IngestSpans',
-    body: request as unknown as Record<string, unknown>
-  })
+  const client = await getEvalOpsConsumerClient()
+  return client.traces.ingestSpans(request)
 }
 
 export async function getEvalOpsServicesStatus(): Promise<EvalOpsServiceStatus[]> {
@@ -158,10 +124,10 @@ export async function getEvalOpsServicesStatus(): Promise<EvalOpsServiceStatus[]
     baseUrl: string
     run: () => Promise<unknown>
   }> = [
-    { service: 'agent-registry', baseUrl: config.agentRegistryBaseUrl, run: () => listEvalOpsAgents({ limit: 1 }) },
-    { service: 'skills', baseUrl: config.skillsBaseUrl, run: () => listEvalOpsSkills({ limit: 1 }) },
-    { service: 'memory', baseUrl: config.memoryBaseUrl, run: () => recallEvalOpsMemory({ query: 'kestrel', topK: 1 }) },
-    { service: 'traces', baseUrl: config.tracesBaseUrl, run: () => listEvalOpsTraces({ limit: 1 }) }
+    { service: 'agent-registry', baseUrl: config.baseUrl, run: () => listEvalOpsAgents({ limit: 1 }) },
+    { service: 'skills', baseUrl: config.baseUrl, run: () => listEvalOpsSkills({ limit: 1 }) },
+    { service: 'memory', baseUrl: config.baseUrl, run: () => recallEvalOpsMemory({ query: 'kestrel', topK: 1 }) },
+    { service: 'traces', baseUrl: config.baseUrl, run: () => listEvalOpsTraces({ limit: 1 }) }
   ]
 
   return Promise.all(checks.map(async (check) => {
