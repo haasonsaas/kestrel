@@ -6,6 +6,12 @@ export type IpcChannels = {
   'settings:set': { args: [key: string, value: unknown]; return: void }
   'settings:getAll': { args: []; return: Record<string, unknown> }
 
+  // EvalOps Platform Auth
+  'evalops:authStatus': { args: []; return: EvalOpsAuthStatus }
+  'evalops:login': { args: [options?: EvalOpsLoginOptions]; return: EvalOpsAuthStatus }
+  'evalops:logout': { args: []; return: EvalOpsAuthStatus }
+  'evalops:refreshAuth': { args: []; return: EvalOpsAuthStatus }
+
   // Database — Threads
   'threads:list': { args: []; return: Thread[] }
   'threads:create': { args: [title?: string]; return: Thread }
@@ -179,6 +185,25 @@ export interface AIModel {
   name: string
   provider: string
   contextWindow: number
+}
+
+export interface EvalOpsLoginOptions {
+  identityBaseUrl?: string
+  resource?: string
+  scopes?: string[]
+  loginHint?: string
+  organizationId?: string
+  prompt?: string
+}
+
+export interface EvalOpsAuthStatus {
+  authenticated: boolean
+  identityBaseUrl: string
+  resource: string
+  organizationId?: string
+  scopes: string[]
+  expiresAt?: number
+  refreshExpiresAt?: string
 }
 
 export interface AppContext {

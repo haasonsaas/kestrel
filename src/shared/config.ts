@@ -23,6 +23,19 @@ export const APP_NAME = 'Kestrel'
 export const APP_ID = 'com.kestrel.app'
 export const APP_VERSION = '0.6.0'
 
+// ── EvalOps Platform Defaults ──
+
+export const EVALOPS_DEFAULT_IDENTITY_BASE_URL = 'http://identity-service.evalops.svc.cluster.local:8080'
+export const EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL = 'http://llm-gateway-service.evalops.svc.cluster.local:8080/v1'
+export const EVALOPS_DEFAULT_RESOURCE = EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL
+export const EVALOPS_DEFAULT_SCOPES = [
+  'llm_gateway:invoke',
+  'agent-registry:read',
+  'agent-registry:write',
+  'memories:read',
+  'memories:write'
+]
+
 // ── Feature Defaults ──
 
 export const CONTEXT_POLL_INTERVAL_MS = 5000
