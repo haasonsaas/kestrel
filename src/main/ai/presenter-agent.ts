@@ -34,6 +34,7 @@ import type { ChatMessage } from './openrouter'
 import type { ContextKitClient } from '../native/contextkit-client'
 import type { MCPServerManager } from '../mcp/manager'
 import type { ChatRequest } from '../../shared/ipc'
+import { recordEvalOpsChatTrace } from '../evalops/services'
 
 let contextKitRef: ContextKitClient | null = null
 
@@ -55,6 +56,7 @@ export async function handleChatStream(
   request: ChatRequest
 ): Promise<void> {
   const db = getDatabase()
+  const startedAt = new Date()
   const event = WideEvent.start('chat_stream', {
     thread_id: request.threadId,
     model: request.model,
@@ -109,6 +111,7 @@ export async function handleChatStream(
 
       // Presenter finalizes: save to DB, notify renderer, track metrics
       onDone: (fullText, toolResults) => {
+        const endedAt = new Date()
         event.setMany({
           response_length: fullText.length,
           tool_calls: toolResults.length,
@@ -118,12 +121,35 @@ export async function handleChatStream(
         })
         event.finish()
 
+        void recordEvalOpsChatTrace({
+          threadId: request.threadId,
+          model: request.model,
+          status: 'SPAN_STATUS_OK',
+          startedAt,
+          endedAt,
+          latencyMs: endedAt.getTime() - startedAt.getTime()
+        }).catch((err) => {
+          console.warn('[evalops:traces] Failed to record chat trace:', err)
+        })
+
         finalize(sender, request, fullText, toolResults, db)
       },
 
       // Presenter handles errors
       onError: (error) => {
+        const endedAt = new Date()
         event.fail(error)
+        void recordEvalOpsChatTrace({
+          threadId: request.threadId,
+          model: request.model,
+          status: 'SPAN_STATUS_ERROR',
+          startedAt,
+          endedAt,
+          latencyMs: endedAt.getTime() - startedAt.getTime(),
+          error
+        }).catch((err) => {
+          console.warn('[evalops:traces] Failed to record chat error trace:', err)
+        })
         if (!sender.isDestroyed()) {
           sender.send('ai:streamError', {
             threadId: request.threadId,
