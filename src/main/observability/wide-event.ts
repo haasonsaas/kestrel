@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid'
-import { getDatabase } from '../db'
+import { recordEvalOpsTelemetryTrace } from '../evalops/services'
 
 /**
  * Wide Event system — one rich canonical log line per unit of work.
@@ -13,7 +13,7 @@ import { getDatabase } from '../db'
  *   event.set('tokens_out', 800)
  *   event.finish({ outcome: 'success' })
  *
- * Events are stored in SQLite and kept in a memory ring buffer for real-time analytics.
+ * Events are exported to EvalOps traces and kept in a memory ring buffer for real-time analytics.
  */
 
 export type EventType =
@@ -59,35 +59,6 @@ export interface WideEventFields {
 
 const RING_BUFFER_SIZE = 1000
 const ringBuffer: WideEventFields[] = []
-
-// Ensure the events table exists
-let tableCreated = false
-function ensureTable(): void {
-  if (tableCreated) return
-  try {
-    const db = getDatabase()
-    db.run({
-      toSQL: () => ({
-        sql: `CREATE TABLE IF NOT EXISTS wide_events (
-          event_id TEXT PRIMARY KEY,
-          event_type TEXT NOT NULL,
-          timestamp TEXT NOT NULL,
-          started_at INTEGER NOT NULL,
-          finished_at INTEGER,
-          duration_ms INTEGER,
-          outcome TEXT,
-          error TEXT,
-          fields TEXT NOT NULL,
-          created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
-        )`,
-        params: []
-      })
-    } as never)
-    tableCreated = true
-  } catch {
-    // DB might not be ready yet — that's OK, we'll try again
-  }
-}
 
 export class WideEvent {
   private fields: WideEventFields
@@ -168,19 +139,9 @@ export class WideEvent {
       ringBuffer.shift()
     }
 
-    // Persist to SQLite (fire-and-forget)
-    try {
-      ensureTable()
-      const db = getDatabase()
-      const sqlite = (db as unknown as { $client: { exec: (sql: string) => void } }).$client
-      if (sqlite?.exec) {
-        const f = this.fields
-        const fieldsJson = JSON.stringify(f).replace(/'/g, "''")
-        sqlite.exec(`INSERT OR IGNORE INTO wide_events (event_id, event_type, timestamp, started_at, finished_at, duration_ms, outcome, error, fields) VALUES ('${f.event_id}', '${f.event_type}', '${f.timestamp}', ${f.started_at}, ${f.finished_at ?? 'NULL'}, ${f.duration_ms ?? 'NULL'}, ${f.outcome ? `'${f.outcome}'` : 'NULL'}, ${f.error ? `'${f.error.replace(/'/g, "''")}'` : 'NULL'}, '${fieldsJson}')`)
-      }
-    } catch {
-      // Non-critical — don't let event persistence break the app
-    }
+    void recordEvalOpsTelemetryTrace(this.fields).catch((err) => {
+      console.warn('[evalops:traces] Failed to export telemetry event:', err instanceof Error ? err.message : err)
+    })
   }
 }
 
