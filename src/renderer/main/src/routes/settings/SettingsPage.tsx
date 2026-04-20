@@ -19,6 +19,7 @@ import { PrivacyControls } from '@/components/settings/PrivacyControls'
 import { MCPServers } from '@/components/settings/MCPServers'
 import { APIKeySettings as APIKeySettingsComponent } from '@/components/settings/APIKeySettings'
 import { EvalOpsSettings as EvalOpsSettingsComponent } from '@/components/settings/EvalOpsSettings'
+import type { KeyboardShortcut } from '@shared/ipc'
 
 type SettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'evalops' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
 
@@ -240,17 +241,84 @@ function MCPSettings() {
 }
 
 function ShortcutSettings() {
+  const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>([])
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    const next = await window.api.invoke('shortcuts:list')
+    setShortcuts(next)
+    setDrafts(Object.fromEntries(next.map((shortcut) => [shortcut.id, shortcut.accelerator])))
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const save = useCallback(async () => {
+    setSaving(true)
+    try {
+      const next = await window.api.invoke('shortcuts:update', shortcuts.map((shortcut) => ({
+        id: shortcut.id,
+        accelerator: drafts[shortcut.id] ?? shortcut.defaultAccelerator
+      })))
+      setShortcuts(next)
+      setDrafts(Object.fromEntries(next.map((shortcut) => [shortcut.id, shortcut.accelerator])))
+      setMessage('Shortcuts saved.')
+      setTimeout(() => setMessage(null), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }, [drafts, shortcuts])
+
+  const reset = useCallback(async () => {
+    setSaving(true)
+    try {
+      const next = await window.api.invoke('shortcuts:reset')
+      setShortcuts(next)
+      setDrafts(Object.fromEntries(next.map((shortcut) => [shortcut.id, shortcut.accelerator])))
+      setMessage('Shortcuts reset.')
+      setTimeout(() => setMessage(null), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
   return (
     <div>
       <h3 className="text-xl font-semibold mb-2">Keyboard Shortcuts</h3>
       <p className="text-sm text-muted-foreground mb-6">
-        Customize keyboard shortcuts.
+        Configure global accelerators for common Kestrel actions.
       </p>
 
       <div className="space-y-4">
-        <ShortcutRow label="Toggle Quick Access Panel" shortcut="Cmd+Shift+Space" />
-        <ShortcutRow label="New Chat" shortcut="Cmd+N" />
-        <ShortcutRow label="Toggle Recording" shortcut="Cmd+Shift+R" />
+        {shortcuts.map((shortcut) => (
+          <ShortcutRow
+            key={shortcut.id}
+            shortcut={shortcut}
+            value={drafts[shortcut.id] ?? shortcut.accelerator}
+            onChange={(value) => setDrafts((current) => ({ ...current, [shortcut.id]: value }))}
+          />
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3 mt-6">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+        >
+          Save Shortcuts
+        </button>
+        <button
+          onClick={reset}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50"
+        >
+          Reset Defaults
+        </button>
+        {message && <span className="text-xs text-green-600">{message}</span>}
       </div>
     </div>
   )
@@ -291,13 +359,36 @@ function SettingRow({
   )
 }
 
-function ShortcutRow({ label, shortcut }: { label: string; shortcut: string }) {
+function ShortcutRow({
+  shortcut,
+  value,
+  onChange
+}: {
+  shortcut: KeyboardShortcut
+  value: string
+  onChange: (value: string) => void
+}) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border">
-      <span className="text-sm">{label}</span>
-      <kbd className="px-2 py-1 text-xs bg-muted rounded border border-border font-mono">
-        {shortcut}
-      </kbd>
+    <div className="flex items-start gap-4 py-3 border-b border-border">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{shortcut.label}</span>
+          <span className={cn(
+            'text-[10px] px-1.5 py-0.5 rounded font-medium',
+            shortcut.registered ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'
+          )}>
+            {shortcut.registered ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">{shortcut.description}</p>
+        {shortcut.error && <p className="text-xs text-destructive mt-1">{shortcut.error}</p>}
+      </div>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={shortcut.defaultAccelerator}
+        className="w-64 rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono"
+      />
     </div>
   )
 }
