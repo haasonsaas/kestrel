@@ -11,6 +11,14 @@ export type IpcChannels = {
   'evalops:login': { args: [options?: EvalOpsLoginOptions]; return: EvalOpsAuthStatus }
   'evalops:logout': { args: []; return: EvalOpsAuthStatus }
   'evalops:refreshAuth': { args: []; return: EvalOpsAuthStatus }
+  'evalops:servicesStatus': { args: []; return: EvalOpsServiceStatus[] }
+  'evalops:agents:list': { args: [request?: EvalOpsListAgentsRequest]; return: EvalOpsListAgentsResponse }
+  'evalops:skills:list': { args: [request?: EvalOpsListSkillsRequest]; return: EvalOpsListSkillsResponse }
+  'evalops:skills:search': { args: [request: EvalOpsSearchSkillsRequest]; return: EvalOpsListSkillsResponse }
+  'evalops:memory:recall': { args: [request: EvalOpsRecallMemoryRequest]; return: EvalOpsRecallMemoryResponse }
+  'evalops:memory:store': { args: [request: EvalOpsStoreMemoryRequest]; return: EvalOpsStoreMemoryResponse }
+  'evalops:traces:list': { args: [request?: EvalOpsListTracesRequest]; return: EvalOpsListTracesResponse }
+  'evalops:traces:ingest': { args: [request: EvalOpsIngestSpansRequest]; return: EvalOpsIngestSpansResponse }
 
   // Database — Threads
   'threads:list': { args: []; return: Thread[] }
@@ -204,6 +212,175 @@ export interface EvalOpsAuthStatus {
   scopes: string[]
   expiresAt?: number
   refreshExpiresAt?: string
+}
+
+export interface EvalOpsServiceStatus {
+  service: 'agent-registry' | 'skills' | 'memory' | 'traces'
+  ok: boolean
+  baseUrl: string
+  error?: string
+}
+
+export interface EvalOpsAgent {
+  id?: string
+  workspaceId?: string
+  name?: string
+  description?: string
+  agentType?: string
+  capabilities?: string[]
+  surfaces?: string[]
+  status?: string
+  activeConfigVersion?: number
+  ownerId?: string
+}
+
+export interface EvalOpsListAgentsRequest {
+  workspaceId?: string
+  agentType?: string
+  capability?: string
+  surface?: string
+  status?: string
+  limit?: number
+  offset?: number
+}
+
+export interface EvalOpsListAgentsResponse {
+  agents: EvalOpsAgent[]
+  total?: number
+}
+
+export interface EvalOpsSkill {
+  id?: string
+  workspaceId?: string
+  ownerId?: string
+  name?: string
+  description?: string
+  scope?: string
+  content?: string
+  currentVersion?: number
+  tags?: string[]
+}
+
+export interface EvalOpsListSkillsRequest {
+  workspaceId?: string
+  scope?: string
+  limit?: number
+  offset?: number
+}
+
+export interface EvalOpsSearchSkillsRequest extends EvalOpsListSkillsRequest {
+  query: string
+  tags?: string[]
+}
+
+export interface EvalOpsListSkillsResponse {
+  skills: EvalOpsSkill[]
+  total?: number
+}
+
+export interface EvalOpsRecallMemoryRequest {
+  query: string
+  scope?: string
+  topK?: number
+  minSimilarity?: number
+  projectId?: string
+  teamId?: string
+  repository?: string
+  agent?: string
+  type?: string
+  agentId?: string
+  userId?: string
+  reviewStatus?: string
+}
+
+export interface EvalOpsStoreMemoryRequest {
+  scope?: string
+  content: string
+  type: string
+  source?: string
+  confidence?: number
+  projectId?: string
+  teamId?: string
+  repository?: string
+  agent?: string
+  agentId?: string
+  userId?: string
+  tags?: string[]
+  pinned?: boolean
+  isPolicy?: boolean
+}
+
+export interface EvalOpsMemory {
+  id?: string
+  scope?: string
+  content?: string
+  type?: string
+  source?: string
+  confidence?: number
+  pinned?: boolean
+  workspaceId?: string
+  userId?: string
+  projectId?: string
+  teamId?: string
+  repository?: string
+  agent?: string
+  agentId?: string
+  tags?: string[]
+}
+
+export interface EvalOpsRecallMemoryResponse {
+  results: Array<{ memory?: EvalOpsMemory; similarity?: number; graphDistance?: number }>
+}
+
+export interface EvalOpsStoreMemoryResponse {
+  memory?: EvalOpsMemory
+}
+
+export interface EvalOpsTraceSpan {
+  traceId: string
+  spanId: string
+  parentSpanId?: string
+  workspaceId: string
+  organizationId?: string
+  agentId?: string
+  surface?: string
+  name: string
+  kind?: string
+  model?: string
+  provider?: string
+  tokenInput?: number
+  tokenOutput?: number
+  latencyMs?: number
+  status?: string
+  costUsd?: number
+  attributes?: Record<string, unknown>
+  startedAt?: string
+  endedAt?: string
+}
+
+export interface EvalOpsIngestSpansRequest {
+  spans: EvalOpsTraceSpan[]
+}
+
+export interface EvalOpsIngestSpansResponse {
+  ingestedCount?: number
+  traces?: unknown[]
+}
+
+export interface EvalOpsListTracesRequest {
+  workspaceId?: string
+  agentId?: string
+  surface?: string
+  startTime?: string
+  endTime?: string
+  limit?: number
+  offset?: number
+}
+
+export interface EvalOpsListTracesResponse {
+  traces: unknown[]
+  total?: number
+  hasMore?: boolean
 }
 
 export interface AppContext {
