@@ -323,6 +323,19 @@ function setupKeyboardShortcuts(): void {
       }
     },
     {
+      id: 'openCommandPalette',
+      label: 'Open Command Palette',
+      description: 'Open quick navigation for chats, agents, traces, approvals, and settings.',
+      defaultAccelerator: 'CommandOrControl+K',
+      run: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+          mainWindow.webContents.send('app:openCommandPalette', {})
+        }
+      }
+    },
+    {
       id: 'toggleRecording',
       label: 'Toggle Recording',
       description: 'Start or stop a manual meeting recording.',
