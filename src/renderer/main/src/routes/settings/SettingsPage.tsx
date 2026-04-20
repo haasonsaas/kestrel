@@ -12,19 +12,22 @@ import {
   Lock,
   Check,
   ExternalLink,
-  Mic
+  Mic,
+  Cloud
 } from 'lucide-react'
 import { PrivacyControls } from '@/components/settings/PrivacyControls'
 import { MCPServers } from '@/components/settings/MCPServers'
 import { APIKeySettings as APIKeySettingsComponent } from '@/components/settings/APIKeySettings'
+import { EvalOpsSettings as EvalOpsSettingsComponent } from '@/components/settings/EvalOpsSettings'
 
-type SettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
+type SettingsTab = 'general' | 'permissions' | 'appearance' | 'privacy' | 'evalops' | 'apikeys' | 'mcp' | 'shortcuts' | 'events'
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Settings }> = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'permissions', label: 'Permissions', icon: Lock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'privacy', label: 'Privacy Controls', icon: Shield },
+  { id: 'evalops', label: 'EvalOps', icon: Cloud },
   { id: 'apikeys', label: 'API Keys', icon: Key },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: Keyboard },
@@ -82,6 +85,8 @@ function SettingsContent({ tab }: { tab: SettingsTab }) {
       return <AppearanceSettings />
     case 'privacy':
       return <PrivacySettings />
+    case 'evalops':
+      return <EvalOpsSettings />
     case 'apikeys':
       return <APIKeySettings />
     case 'mcp':
@@ -220,6 +225,10 @@ function AppearanceSettings() {
 
 function PrivacySettings() {
   return <PrivacyControls />
+}
+
+function EvalOpsSettings() {
+  return <EvalOpsSettingsComponent />
 }
 
 function APIKeySettings() {

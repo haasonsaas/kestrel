@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { Bird, Check, X, ExternalLink, Shield, Mic, Monitor, Key, ArrowRight } from 'lucide-react'
+import { Bird, Check, ExternalLink, Shield, Mic, Monitor, ArrowRight, LogIn } from 'lucide-react'
+import type { EvalOpsAuthStatus } from '@shared/ipc'
 
 interface PermissionState {
   accessibility: boolean
@@ -14,12 +15,13 @@ interface OnboardingProps {
 }
 
 export function Onboarding({ onComplete }: OnboardingProps) {
-  const [step, setStep] = useState<'welcome' | 'permissions' | 'apikey' | 'done'>('welcome')
+  const [step, setStep] = useState<'welcome' | 'permissions' | 'evalops' | 'done'>('welcome')
   const [permissions, setPermissions] = useState<PermissionState>({
     accessibility: false, microphone: false, screenRecording: false, allGranted: false
   })
-  const [apiKey, setApiKey] = useState('')
-  const [apiKeySaved, setApiKeySaved] = useState(false)
+  const [authStatus, setAuthStatus] = useState<EvalOpsAuthStatus | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [signingIn, setSigningIn] = useState(false)
   const [checking, setChecking] = useState(false)
 
   const checkPermissions = useCallback(async () => {
@@ -39,21 +41,29 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   }, [checkPermissions])
 
   useEffect(() => {
-    // Check if API key already exists
-    window.api.invoke('settings:get', 'openrouter_api_key').then((key) => {
-      if (key) { setApiKey('••••••••••'); setApiKeySaved(true) }
-    })
+    window.api.invoke('evalops:authStatus').then(setAuthStatus)
   }, [])
 
   const openSettings = useCallback(async (pane: string) => {
     await window.api.invoke('permissions:openSettings', pane)
   }, [])
 
-  const saveApiKey = useCallback(async () => {
-    if (!apiKey.trim() || apiKey === '••••••••••') return
-    await window.api.invoke('settings:set', 'openrouter_api_key', apiKey.trim())
-    setApiKeySaved(true)
-  }, [apiKey])
+  const signIn = useCallback(async () => {
+    setSigningIn(true)
+    setAuthError(null)
+    try {
+      setAuthStatus(await window.api.invoke('evalops:login'))
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSigningIn(false)
+    }
+  }, [])
+
+  const complete = useCallback(() => {
+    window.api.invoke('settings:set', 'onboarding_complete', true)
+    onComplete()
+  }, [onComplete])
 
   return (
     <div className="flex items-center justify-center h-screen bg-background">
@@ -119,7 +129,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 Back
               </button>
               <button
-                onClick={() => setStep('apikey')}
+                onClick={() => setStep('evalops')}
                 className={cn(
                   'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all',
                   permissions.accessibility
@@ -140,45 +150,50 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           </div>
         )}
 
-        {step === 'apikey' && (
+        {step === 'evalops' && (
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight mb-2">API Key</h2>
+            <h2 className="text-2xl font-semibold tracking-tight mb-2">EvalOps Sign In</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Kestrel uses OpenRouter for AI. All models (GPT, Claude, Gemini) through one key.
+              Kestrel uses EvalOps identity for managed platform services and LLM gateway access.
             </p>
 
             <div className="space-y-4 mb-8">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">OpenRouter API Key</label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => { setApiKey(e.target.value); setApiKeySaved(false) }}
-                    placeholder="sk-or-..."
-                    className="flex-1 rounded-xl border border-input bg-card px-3 py-2.5 text-sm font-mono"
-                  />
-                  <button
-                    onClick={saveApiKey}
-                    disabled={!apiKey.trim() || apiKey === '••••••••••'}
-                    className={cn(
-                      'px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-                      apiKeySaved
-                        ? 'bg-green-500/10 text-green-600 border border-green-500/20'
-                        : 'bg-foreground text-background disabled:opacity-30'
-                    )}
-                  >
-                    {apiKeySaved ? (
-                      <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Saved</span>
-                    ) : 'Save'}
-                  </button>
+              <div className={cn(
+                'rounded-2xl border p-4',
+                authStatus?.authenticated ? 'border-green-500/20 bg-green-500/5' : 'border-border bg-card'
+              )}>
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl flex items-center justify-center',
+                    authStatus?.authenticated ? 'bg-green-500/10' : 'bg-muted'
+                  )}>
+                    {authStatus?.authenticated
+                      ? <Check className="h-5 w-5 text-green-600" />
+                      : <Shield className="h-5 w-5 text-muted-foreground" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      {authStatus?.authenticated ? 'Signed in to EvalOps' : 'Not signed in'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {authStatus?.organizationId || authStatus?.identityBaseUrl || 'EvalOps identity service'}
+                    </p>
+                  </div>
+                  {!authStatus?.authenticated && (
+                    <button
+                      onClick={signIn}
+                      disabled={signingIn}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium disabled:opacity-40"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      {signingIn ? 'Waiting...' : 'Sign In'}
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Get one free at{' '}
-                  <button onClick={() => window.api.invoke('window:close')} className="text-warm underline">
-                    openrouter.ai/keys
-                  </button>
-                </p>
+                {authError && (
+                  <p className="text-xs text-red-600 mt-3">{authError}</p>
+                )}
               </div>
             </div>
 
@@ -190,13 +205,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 Back
               </button>
               <button
-                onClick={() => {
-                  window.api.invoke('settings:set', 'onboarding_complete', true)
-                  onComplete()
-                }}
+                onClick={complete}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background font-medium hover:opacity-90"
               >
-                {apiKeySaved ? 'Start Using Kestrel' : 'Skip for now'}
+                {authStatus?.authenticated ? 'Start Using Kestrel' : 'Skip for now'}
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>

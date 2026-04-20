@@ -25,6 +25,7 @@ import { registerPermissionHandlers } from './permissions'
 import { registerJournalHandlers } from './journal/handlers'
 import { MCPServerManager } from './mcp/manager'
 import { registerMCPHandlers } from './mcp/handlers'
+import { registerEvalOpsHandlers } from './evalops/handlers'
 import { shouldExcludeContext } from './privacy/rules'
 import { WideEvent, getEventSnapshot, getRecentEvents } from './observability/wide-event'
 
@@ -70,6 +71,7 @@ app.whenReady().then(async () => {
   registerJournalHandlers()
   registerMCPHandlers(mcpManager)
   registerPermissionHandlers()
+  registerEvalOpsHandlers()
 
   // Context IPC handlers
   ipcMain.handle('context:get', async () => {
