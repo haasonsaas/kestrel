@@ -32,7 +32,7 @@ export async function listEvalOpsAgents(request: EvalOpsListAgentsRequest = {}):
     service: AGENT_SERVICE,
     method: 'List',
     body: cleanRecord({
-      workspaceId: request.workspaceId,
+      workspaceId: request.workspaceId ?? config.workspaceId,
       agentType: request.agentType,
       capability: request.capability,
       surface: request.surface,

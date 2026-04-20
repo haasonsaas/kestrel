@@ -1,4 +1,5 @@
 import { getEvalOpsAccessToken, getStoredEvalOpsSession } from './auth'
+import { getEvalOpsConfig } from './config'
 
 const CONNECT_PROTOCOL_VERSION = '1'
 
@@ -22,6 +23,7 @@ export class EvalOpsConnectError extends Error {
 }
 
 export async function evalOpsUnary<T>(input: ConnectUnaryInput): Promise<T> {
+  const config = getEvalOpsConfig()
   const token = await getEvalOpsAccessToken()
   const session = getStoredEvalOpsSession()
   const url = `${input.baseUrl.replace(/\/+$/, '')}/${input.service}/${input.method}`
@@ -35,7 +37,7 @@ export async function evalOpsUnary<T>(input: ConnectUnaryInput): Promise<T> {
 
   if (session?.organizationId) {
     headers['X-Organization-ID'] = session.organizationId
-    headers['X-Workspace-ID'] = session.organizationId
+    headers['X-Workspace-ID'] = config.workspaceId
   }
 
   const response = await fetch(url, {
