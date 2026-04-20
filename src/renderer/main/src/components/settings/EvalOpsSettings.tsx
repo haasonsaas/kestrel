@@ -36,8 +36,8 @@ export function EvalOpsSettings() {
     load()
   }, [load])
 
-  const saveConfig = useCallback(async () => {
-    setBusy(true)
+  const persistConfig = useCallback(async (manageBusy = true) => {
+    if (manageBusy) setBusy(true)
     setError(null)
     try {
       await window.api.invoke('settings:set', 'evalops_config', {
@@ -50,16 +50,21 @@ export function EvalOpsSettings() {
       setTimeout(() => setMessage(null), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+      throw err
     } finally {
-      setBusy(false)
+      if (manageBusy) setBusy(false)
     }
   }, [identityBaseUrl, parsedScopes, resource])
+
+  const saveConfig = useCallback(async () => {
+    await persistConfig()
+  }, [persistConfig])
 
   const signIn = useCallback(async () => {
     setBusy(true)
     setError(null)
     try {
-      await saveConfig()
+      await persistConfig(false)
       const next = await window.api.invoke('evalops:login', {
         identityBaseUrl: identityBaseUrl.trim(),
         resource: resource.trim(),
@@ -71,7 +76,7 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [identityBaseUrl, parsedScopes, resource, saveConfig])
+  }, [identityBaseUrl, parsedScopes, persistConfig, resource])
 
   const signOut = useCallback(async () => {
     setBusy(true)

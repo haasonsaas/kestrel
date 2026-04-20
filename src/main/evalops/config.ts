@@ -26,6 +26,7 @@ interface StoredEvalOpsConfig {
 export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOpsConfig {
   const stored = getSettingValue<StoredEvalOpsConfig>(EVALOPS_CONFIG_KEY) ?? {}
   const llmGatewayBaseUrl = cleanUrl(
+    overrides.llmGatewayBaseUrl,
     process.env.EVALOPS_LLM_GATEWAY_BASE_URL,
     asString(stored.llmGatewayBaseUrl),
     EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL
@@ -33,12 +34,14 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
 
   return {
     identityBaseUrl: cleanUrl(
+      overrides.identityBaseUrl,
       process.env.EVALOPS_IDENTITY_BASE_URL,
       asString(stored.identityBaseUrl),
       EVALOPS_DEFAULT_IDENTITY_BASE_URL
     ),
     llmGatewayBaseUrl,
     resource: cleanUrl(
+      overrides.resource,
       process.env.EVALOPS_RESOURCE,
       asString(stored.resource),
       EVALOPS_DEFAULT_RESOURCE

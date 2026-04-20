@@ -145,11 +145,19 @@ export async function logoutEvalOps(): Promise<EvalOpsAuthStatus> {
     try {
       const metadata = await fetchOAuthMetadata(session.identityBaseUrl)
       if (metadata.revocation_endpoint) {
-        await fetch(metadata.revocation_endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: session.refreshToken })
+        const form = new URLSearchParams({
+          token: session.refreshToken,
+          token_type_hint: 'refresh_token',
+          client_id: session.clientId
         })
+        const response = await fetch(metadata.revocation_endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form
+        })
+        if (!response.ok) {
+          throw new Error(`EvalOps token revocation failed (${response.status}): ${await response.text()}`)
+        }
       }
     } catch (err) {
       console.warn('[evalops:auth] Token revocation failed:', err)
@@ -176,7 +184,7 @@ async function getFreshSession(minValidityMs = 60_000): Promise<StoredAuthSessio
   const session = getStoredSession()
   if (!session) return null
   if (Date.now() + minValidityMs < session.expiresAt) return session
-  if (!session.refreshToken) return session
+  if (!session.refreshToken) return null
   return refreshSession(session)
 }
 
