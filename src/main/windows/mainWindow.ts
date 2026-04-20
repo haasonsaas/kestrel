@@ -3,6 +3,8 @@ import windowState from 'electron-window-state'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
+const WINDOW_STATE_SAVE_INTERVAL_MS = 30_000
+
 export function createMainWindow(): BrowserWindow {
   const state = windowState({
     defaultWidth: 1200,
@@ -29,6 +31,16 @@ export function createMainWindow(): BrowserWindow {
   })
 
   state.manage(mainWindow)
+  const saveStateInterval = setInterval(() => {
+    if (!mainWindow.isDestroyed()) {
+      state.saveState(mainWindow)
+    }
+  }, WINDOW_STATE_SAVE_INTERVAL_MS)
+  saveStateInterval.unref?.()
+
+  mainWindow.on('closed', () => {
+    clearInterval(saveStateInterval)
+  })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
