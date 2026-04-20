@@ -34,6 +34,12 @@ export const EVALOPS_DEFAULT_TRACES_BASE_URL = 'http://traces-service.evalops.sv
 export const EVALOPS_DEFAULT_RESOURCE = EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL
 export const EVALOPS_DEFAULT_WORKSPACE_ID = 'default'
 export const EVALOPS_DEFAULT_AGENT_ID = 'kestrel-desktop'
+export const EVALOPS_DEFAULT_PROVIDER_REF = {
+  provider: 'openrouter',
+  environment: 'prod',
+  credentialName: '',
+  teamId: ''
+}
 export const EVALOPS_DEFAULT_SCOPES = [
   'llm_gateway:invoke',
   'agent-registry:read',

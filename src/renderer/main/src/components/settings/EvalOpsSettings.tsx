@@ -5,6 +5,7 @@ import {
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
   EVALOPS_DEFAULT_MEMORY_BASE_URL,
+  EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
   EVALOPS_DEFAULT_SKILLS_BASE_URL,
@@ -23,6 +24,12 @@ interface StoredEvalOpsConfig {
   tracesBaseUrl?: string
   workspaceId?: string
   agentId?: string
+  providerRef?: {
+    provider?: string
+    environment?: string
+    credentialName?: string
+    teamId?: string
+  }
 }
 
 export function EvalOpsSettings() {
@@ -36,6 +43,10 @@ export function EvalOpsSettings() {
   const [tracesBaseUrl, setTracesBaseUrl] = useState(EVALOPS_DEFAULT_TRACES_BASE_URL)
   const [workspaceId, setWorkspaceId] = useState(EVALOPS_DEFAULT_WORKSPACE_ID)
   const [agentId, setAgentId] = useState(EVALOPS_DEFAULT_AGENT_ID)
+  const [provider, setProvider] = useState(EVALOPS_DEFAULT_PROVIDER_REF.provider)
+  const [providerEnvironment, setProviderEnvironment] = useState(EVALOPS_DEFAULT_PROVIDER_REF.environment)
+  const [providerCredentialName, setProviderCredentialName] = useState(EVALOPS_DEFAULT_PROVIDER_REF.credentialName)
+  const [providerTeamId, setProviderTeamId] = useState(EVALOPS_DEFAULT_PROVIDER_REF.teamId)
   const [serviceStatuses, setServiceStatuses] = useState<EvalOpsServiceStatus[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -54,6 +65,10 @@ export function EvalOpsSettings() {
     if (stored?.tracesBaseUrl) setTracesBaseUrl(stored.tracesBaseUrl)
     if (stored?.workspaceId) setWorkspaceId(stored.workspaceId)
     if (stored?.agentId) setAgentId(stored.agentId)
+    if (stored?.providerRef?.provider) setProvider(stored.providerRef.provider)
+    if (stored?.providerRef?.environment) setProviderEnvironment(stored.providerRef.environment)
+    if (stored?.providerRef?.credentialName) setProviderCredentialName(stored.providerRef.credentialName)
+    if (stored?.providerRef?.teamId) setProviderTeamId(stored.providerRef.teamId)
     setStatus(await window.api.invoke('evalops:authStatus'))
   }, [])
 
@@ -74,7 +89,13 @@ export function EvalOpsSettings() {
         memoryBaseUrl: memoryBaseUrl.trim(),
         tracesBaseUrl: tracesBaseUrl.trim(),
         workspaceId: workspaceId.trim(),
-        agentId: agentId.trim()
+        agentId: agentId.trim(),
+        providerRef: {
+          provider: provider.trim(),
+          environment: providerEnvironment.trim(),
+          credentialName: providerCredentialName.trim(),
+          teamId: providerTeamId.trim()
+        }
       })
       setStatus(await window.api.invoke('evalops:authStatus'))
       setMessage('Saved EvalOps settings.')
@@ -84,7 +105,7 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [agentId, agentRegistryBaseUrl, identityBaseUrl, memoryBaseUrl, parsedScopes, resource, skillsBaseUrl, tracesBaseUrl, workspaceId])
+  }, [agentId, agentRegistryBaseUrl, identityBaseUrl, memoryBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, skillsBaseUrl, tracesBaseUrl, workspaceId])
 
   const signIn = useCallback(async () => {
     setBusy(true)
@@ -227,6 +248,33 @@ export function EvalOpsSettings() {
             value={agentId}
             onChange={setAgentId}
             placeholder={EVALOPS_DEFAULT_AGENT_ID}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <TextSetting
+            label="Provider Ref"
+            value={provider}
+            onChange={setProvider}
+            placeholder={EVALOPS_DEFAULT_PROVIDER_REF.provider}
+          />
+          <TextSetting
+            label="Provider Environment"
+            value={providerEnvironment}
+            onChange={setProviderEnvironment}
+            placeholder={EVALOPS_DEFAULT_PROVIDER_REF.environment}
+          />
+          <TextSetting
+            label="Provider Credential"
+            value={providerCredentialName}
+            onChange={setProviderCredentialName}
+            placeholder="default"
+          />
+          <TextSetting
+            label="Provider Team ID"
+            value={providerTeamId}
+            onChange={setProviderTeamId}
+            placeholder="team_platform"
           />
         </div>
 

@@ -294,7 +294,7 @@ async function postTokenRequest(tokenEndpoint: string, form: URLSearchParams): P
 function sessionFromToken(
   token: OAuthTokenResponse,
   clientId: string,
-  config: EvalOpsConfig
+  config: Pick<EvalOpsConfig, 'identityBaseUrl' | 'resource' | 'scopes'>
 ): StoredAuthSession {
   const now = Date.now()
   const expiresInMs = Math.max(token.expires_in ?? 3600, 0) * 1000
