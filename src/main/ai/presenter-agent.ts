@@ -18,7 +18,7 @@
  */
 
 import { v4 as uuid } from 'uuid'
-import { buildSystemMessage } from './context-builder'
+import { DEFAULT_CHAT_SYSTEM_PROMPT, buildSystemMessage } from './context-builder'
 import {
   gatherContext,
   runExecutionLoop,
@@ -35,6 +35,7 @@ import type { ContextKitClient } from '../native/contextkit-client'
 import type { MCPServerManager } from '../mcp/manager'
 import type { ChatRequest } from '../../shared/ipc'
 import { recordEvalOpsChatTrace } from '../evalops/services'
+import { KESTREL_PROMPT_NAMES, resolveEvalOpsPrompt } from '../evalops/prompts'
 
 let contextKitRef: ContextKitClient | null = null
 
@@ -72,7 +73,7 @@ export async function handleChatStream(
   }
 
   // ── Phase 2: Presenter builds the conversation ──
-  const messages = buildConversation(request, execCtx)
+  const messages = await buildConversation(request, execCtx)
 
   // ── Phase 3: Executor runs the model + tool loop ──
   runExecutionLoop(
@@ -165,14 +166,15 @@ export async function handleChatStream(
  * Build the full conversation array from request + execution context.
  * This is the Presenter's job — deciding what the AI sees.
  */
-function buildConversation(
+async function buildConversation(
   request: ChatRequest,
   execCtx: ExecutionContext
-): ChatMessage[] {
+): Promise<ChatMessage[]> {
   const messages: ChatMessage[] = []
 
   // System prompt — Presenter decides the AI's identity and tone
-  const systemPrompt = buildSystemMessage(execCtx.contextResult, execCtx.mcpToolsBlock)
+  const basePrompt = await resolveEvalOpsPrompt(KESTREL_PROMPT_NAMES.chat, DEFAULT_CHAT_SYSTEM_PROMPT)
+  const systemPrompt = buildSystemMessage(execCtx.contextResult, execCtx.mcpToolsBlock, basePrompt)
   messages.push({ role: 'system', content: systemPrompt })
 
   // Conversation history (skip renderer-side system messages)

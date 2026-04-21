@@ -30,6 +30,7 @@ export const EVALOPS_DEFAULT_BASE_URL = 'https://api.evalops.dev'
 export const EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL = 'https://llm-gateway.evalops.dev/v1'
 export const EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL = 'https://agent-registry.evalops.dev'
 export const EVALOPS_DEFAULT_APPROVALS_BASE_URL = 'https://approvals.evalops.dev'
+export const EVALOPS_DEFAULT_PROMPTS_BASE_URL = 'https://prompts.evalops.dev'
 export const EVALOPS_DEFAULT_SKILLS_BASE_URL = 'https://skills.evalops.dev'
 export const EVALOPS_DEFAULT_MEMORY_BASE_URL = 'https://memory.evalops.dev'
 export const EVALOPS_DEFAULT_TRACES_BASE_URL = 'https://traces.evalops.dev'
@@ -46,6 +47,7 @@ export const EVALOPS_DEFAULT_SCOPES = [
   'llm_gateway:invoke',
   'agent-registry:read',
   'agent-registry:write',
+  'prompts:read',
   'memories:read',
   'memories:write'
 ]

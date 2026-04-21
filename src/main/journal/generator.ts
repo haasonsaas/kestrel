@@ -2,7 +2,22 @@ import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { chatCompletion } from '../ai/llm-gateway'
 import { redactPiiForPlatform } from '../privacy/pii'
+import { KESTREL_PROMPT_NAMES, resolveEvalOpsPrompt } from '../evalops/prompts'
 import { INTERNAL_MODEL } from '../../shared/config'
+
+const DEFAULT_JOURNAL_PROMPT = `You are a personal journal generator. Generate a reflective daily journal entry from the user's activity data.
+
+Generate a journal entry with:
+1. A creative title for the day
+2. A TLDR (1 sentence)
+3. A reflective journal entry (3-5 paragraphs, written in first person, focusing on key activities, themes, and reflections)
+
+Format as JSON:
+{
+  "title": "...",
+  "tldr": "...",
+  "content": "..."
+}`
 
 export async function generateJournal(date: string): Promise<{
   title: string
@@ -46,24 +61,19 @@ export async function generateJournal(date: string): Promise<{
     .join('\n')
   const meetingSummary = redactPiiForPlatform(meetingSummaryRaw, 'journal_meeting_summary').text
 
-  const prompt = `You are a personal journal generator. Based on the following activity data from ${date}, generate a reflective daily journal entry.
+  const instructions = await resolveEvalOpsPrompt(
+    KESTREL_PROMPT_NAMES.journal,
+    DEFAULT_JOURNAL_PROMPT
+  )
+
+  const prompt = `${instructions}
+
+Date: ${date}
 
 ${contextSummary ? `App activity:\n${contextSummary}\n` : 'No app activity data available.\n'}
 ${meetingSummary ? `Meetings:\n${meetingSummary}\n` : ''}
 
-Generate a journal entry with:
-1. A creative title for the day
-2. A TLDR (1 sentence)
-3. A reflective journal entry (3-5 paragraphs, written in first person, focusing on key activities, themes, and reflections)
-
-${!contextSummary && !meetingSummary ? 'Since no activity data is available, generate a general reflective journal prompt for the day.' : ''}
-
-Format as JSON:
-{
-  "title": "...",
-  "tldr": "...",
-  "content": "..."
-}`
+${!contextSummary && !meetingSummary ? 'Since no activity data is available, generate a general reflective journal prompt for the day.' : ''}`
 
   const response = await chatCompletion(
     [{ role: 'user', content: prompt }],

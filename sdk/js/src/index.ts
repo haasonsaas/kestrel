@@ -8,6 +8,7 @@ export interface EvalOpsServiceEndpoints {
   memoryBaseUrl?: string
   tracesBaseUrl?: string
   approvalsBaseUrl?: string
+  promptsBaseUrl?: string
   llmGatewayBaseUrl?: string
 }
 

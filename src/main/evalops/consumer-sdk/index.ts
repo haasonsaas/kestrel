@@ -4,6 +4,7 @@ import {
   ConnectorsClient,
   MemoryClient,
   MeterClient,
+  PromptsClient,
   SkillsClient,
   TracesClient
 } from './clients'
@@ -17,6 +18,7 @@ export class EvalOpsClient {
   readonly traces: TracesClient
   readonly agentRegistry: AgentRegistryClient
   readonly skills: SkillsClient
+  readonly prompts: PromptsClient
   readonly connectors: ConnectorsClient
 
   private readonly transport: EvalOpsTransport
@@ -29,6 +31,7 @@ export class EvalOpsClient {
     this.traces = new TracesClient(this.transport)
     this.agentRegistry = new AgentRegistryClient(this.transport)
     this.skills = new SkillsClient(this.transport)
+    this.prompts = new PromptsClient(this.transport)
     this.connectors = new ConnectorsClient(this.transport)
   }
 
