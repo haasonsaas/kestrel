@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { getEvalOpsAuthStatus, loginEvalOps, logoutEvalOps } from './auth'
 import { registerKestrelAgentInBackground } from './registration'
 import {
+  annotateEvalOpsTraceQuality,
   getEvalOpsServicesStatus,
   ingestEvalOpsSpans,
   listEvalOpsAgents,
@@ -9,10 +10,13 @@ import {
   listEvalOpsSkills,
   listEvalOpsTraces,
   recallEvalOpsMemory,
+  recordEvalOpsArenaTrace,
+  recordEvalOpsArenaVote,
   searchEvalOpsSkills,
   storeEvalOpsMemory
 } from './services'
 import type {
+  EvalOpsAnnotateTraceQualityRequest,
   EvalOpsIngestSpansRequest,
   EvalOpsListApprovalsRequest,
   EvalOpsListAgentsRequest,
@@ -20,6 +24,8 @@ import type {
   EvalOpsListTracesRequest,
   EvalOpsLoginOptions,
   EvalOpsRecallMemoryRequest,
+  EvalOpsRecordArenaTraceRequest,
+  EvalOpsRecordArenaVoteRequest,
   EvalOpsSearchSkillsRequest,
   EvalOpsStoreMemoryRequest
 } from '../../shared/ipc'
@@ -57,5 +63,14 @@ export function registerEvalOpsHandlers(): void {
   })
   ipcMain.handle('evalops:traces:ingest', async (_event, request: EvalOpsIngestSpansRequest) => {
     return ingestEvalOpsSpans(request)
+  })
+  ipcMain.handle('evalops:traces:annotateQuality', async (_event, request: EvalOpsAnnotateTraceQualityRequest) => {
+    return annotateEvalOpsTraceQuality(request)
+  })
+  ipcMain.handle('evalops:arena:recordTrace', async (_event, request: EvalOpsRecordArenaTraceRequest) => {
+    return recordEvalOpsArenaTrace(request)
+  })
+  ipcMain.handle('evalops:arena:recordVote', async (_event, request: EvalOpsRecordArenaVoteRequest) => {
+    return recordEvalOpsArenaVote(request)
   })
 }
