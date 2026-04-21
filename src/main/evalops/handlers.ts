@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { getEvalOpsAuthStatus, loginEvalOps, logoutEvalOps } from './auth'
+import { registerKestrelAgentInBackground } from './registration'
 import {
   getEvalOpsServicesStatus,
   ingestEvalOpsSpans,
@@ -26,7 +27,9 @@ import type {
 export function registerEvalOpsHandlers(): void {
   ipcMain.handle('evalops:authStatus', async () => getEvalOpsAuthStatus())
   ipcMain.handle('evalops:login', async (_event, options?: EvalOpsLoginOptions) => {
-    return loginEvalOps(options)
+    const status = await loginEvalOps(options)
+    if (status.authenticated) registerKestrelAgentInBackground('login')
+    return status
   })
   ipcMain.handle('evalops:logout', async () => logoutEvalOps())
   ipcMain.handle('evalops:refreshAuth', async () => getEvalOpsAuthStatus())

@@ -26,6 +26,7 @@ import { registerJournalHandlers } from './journal/handlers'
 import { MCPServerManager } from './mcp/manager'
 import { registerMCPHandlers } from './mcp/handlers'
 import { registerEvalOpsHandlers } from './evalops/handlers'
+import { registerKestrelAgentInBackground } from './evalops/registration'
 import { registerUpdateHandlers } from './updates'
 import { registerKeyboardShortcutHandlers, unregisterKeyboardShortcuts } from './shortcuts'
 import { registerPlatformNotificationHandlers, unregisterPlatformNotificationHandlers } from './platform-notifications'
@@ -106,6 +107,7 @@ if (!gotSingleInstanceLock) {
   registerMCPHandlers(mcpManager)
   registerPermissionHandlers()
   registerEvalOpsHandlers()
+  registerKestrelAgentInBackground('startup')
   registerUpdateHandlers()
 
   // Context IPC handlers
