@@ -147,6 +147,19 @@ export class MCPServerManager {
     return allTools
   }
 
+  getTool(serverName: string, toolName: string): MCPTool | null {
+    const conn = this.connections.get(serverName)
+    if (!conn || conn.status !== 'connected') return null
+    const tool = conn.tools.find((candidate) => candidate.name === toolName)
+    if (!tool) return null
+    return {
+      server: serverName,
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema
+    }
+  }
+
   async stopAll(): Promise<void> {
     const names = Array.from(this.connections.keys())
     await Promise.all(names.map((name) => this.stopServer(name)))

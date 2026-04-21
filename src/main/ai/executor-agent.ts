@@ -24,6 +24,7 @@ import {
   parseToolName,
   type ContextPromptResult
 } from './context-builder'
+import { requestEvalOpsMCPToolApproval } from '../evalops/approvals'
 import { WideEvent } from '../observability/wide-event'
 import { redactPiiForPlatform } from '../privacy/pii'
 import type { ContextKitClient } from '../native/contextkit-client'
@@ -126,6 +127,22 @@ export async function executeTool(
 
     if (!mcpManagerRef) {
       throw new Error('MCP server manager not available')
+    }
+
+    const approval = await requestEvalOpsMCPToolApproval({
+      serverName,
+      toolName,
+      args,
+      tool: mcpManagerRef.getTool(serverName, toolName)
+    })
+    event
+      .set('approval_risk', approval.riskLevel)
+      .set('approval_offline', approval.offline)
+      .set('approval_allowed', approval.allowed)
+    if (approval.requestId) event.set('approval_request_id', approval.requestId)
+    if (approval.decision) event.set('approval_decision', approval.decision)
+    if (!approval.allowed) {
+      throw new Error(approval.reason || 'EvalOps approval denied this tool call.')
     }
 
     const result = await mcpManagerRef.callTool(serverName, toolName, args)

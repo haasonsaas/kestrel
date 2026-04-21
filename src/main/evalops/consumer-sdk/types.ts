@@ -176,6 +176,61 @@ export interface ApprovalListPendingResponse extends JsonObject {
   reason?: string
 }
 
+export type ApprovalRiskLevel =
+  | 'RISK_LEVEL_UNSPECIFIED'
+  | 'RISK_LEVEL_LOW'
+  | 'RISK_LEVEL_MEDIUM'
+  | 'RISK_LEVEL_HIGH'
+  | 'RISK_LEVEL_CRITICAL'
+
+export type ApprovalDecisionType =
+  | 'DECISION_TYPE_UNSPECIFIED'
+  | 'DECISION_TYPE_APPROVED'
+  | 'DECISION_TYPE_DENIED'
+  | 'DECISION_TYPE_ESCALATED'
+  | 'DECISION_TYPE_EXPIRED'
+  | 'DECISION_TYPE_AUTO_APPROVED'
+
+export interface ApprovalRequestApprovalRequest extends JsonObject {
+  workspaceId: string
+  approverUserId?: string
+  agentId?: string
+  surface?: string
+  actionType: string
+  actionPayload?: string
+  riskLevel?: ApprovalRiskLevel
+  contextJson?: string
+}
+
+export interface ApprovalRequestApprovalResponse extends JsonObject {
+  approvalRequest?: ApprovalRequestRecord
+  autoApproveEvidence?: JsonObject
+  offline?: boolean
+  reason?: string
+}
+
+export interface ApprovalDecisionRecord extends JsonObject {
+  id?: string
+  approvalRequestId?: string
+  decision?: ApprovalDecisionType
+  decidedBy?: string
+  reason?: string
+  decidedAt?: string
+}
+
+export interface ApprovalGetRequest extends JsonObject {
+  approvalRequestId: string
+  workspaceId?: string
+}
+
+export interface ApprovalGetResponse extends JsonObject {
+  approvalRequest?: ApprovalRequestRecord
+  decisions?: ApprovalDecisionRecord[]
+  state?: string
+  offline?: boolean
+  reason?: string
+}
+
 export interface TraceSpan extends JsonObject {
   traceId: string
   spanId: string
