@@ -20,6 +20,9 @@ export type IpcChannels = {
   'evalops:approvals:list': { args: [request?: EvalOpsListApprovalsRequest]; return: EvalOpsListApprovalsResponse }
   'evalops:traces:list': { args: [request?: EvalOpsListTracesRequest]; return: EvalOpsListTracesResponse }
   'evalops:traces:ingest': { args: [request: EvalOpsIngestSpansRequest]; return: EvalOpsIngestSpansResponse }
+  'evalops:traces:annotateQuality': { args: [request: EvalOpsAnnotateTraceQualityRequest]; return: EvalOpsAnnotateTraceQualityResponse }
+  'evalops:arena:recordTrace': { args: [request: EvalOpsRecordArenaTraceRequest]; return: EvalOpsRecordArenaTraceResponse }
+  'evalops:arena:recordVote': { args: [request: EvalOpsRecordArenaVoteRequest]; return: EvalOpsAnnotateTraceQualityResponse[] }
 
   // Database — Threads
   'threads:list': { args: []; return: Thread[] }
@@ -444,6 +447,31 @@ export interface EvalOpsTraceSpan {
   endedAt?: string
 }
 
+export interface EvalOpsTraceAssertionResult {
+  assertionId?: string
+  name?: string
+  passed?: boolean
+  score?: number
+  reason?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface EvalOpsTraceQualityAnnotation {
+  traceId: string
+  spanId?: string
+  compositeScore?: number
+  assertions?: EvalOpsTraceAssertionResult[]
+  cost?: {
+    currencyCode?: string
+    amount?: number
+  }
+  qualityPerDollar?: number
+  evalSuiteId?: string
+  scoredAt?: string
+  scorer?: string
+  metadata?: Record<string, unknown>
+}
+
 export interface EvalOpsIngestSpansRequest {
   spans: EvalOpsTraceSpan[]
 }
@@ -451,6 +479,52 @@ export interface EvalOpsIngestSpansRequest {
 export interface EvalOpsIngestSpansResponse {
   ingestedCount?: number
   traces?: unknown[]
+}
+
+export interface EvalOpsAnnotateTraceQualityRequest {
+  annotation: EvalOpsTraceQualityAnnotation
+}
+
+export interface EvalOpsAnnotateTraceQualityResponse {
+  annotation?: EvalOpsTraceQualityAnnotation
+  offline?: boolean
+  reason?: string
+}
+
+export interface EvalOpsArenaTraceResponseInput {
+  spanId: string
+  model: string
+  modelName?: string
+  content?: string
+  error?: string
+  startedAt?: string
+  endedAt?: string
+  latencyMs?: number
+}
+
+export interface EvalOpsRecordArenaTraceRequest {
+  sessionId: string
+  traceId: string
+  rootSpanId: string
+  prompt: string
+  createdAt: string
+  completedAt: string
+  responses: EvalOpsArenaTraceResponseInput[]
+}
+
+export interface EvalOpsRecordArenaTraceResponse {
+  traceId: string
+  ingestedCount?: number
+  annotations: EvalOpsAnnotateTraceQualityResponse[]
+  offline?: boolean
+  reason?: string
+}
+
+export interface EvalOpsRecordArenaVoteRequest {
+  sessionId: string
+  traceId: string
+  winnerSpanId: string
+  responses: EvalOpsArenaTraceResponseInput[]
 }
 
 export interface EvalOpsListTracesRequest {

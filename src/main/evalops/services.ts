@@ -5,6 +5,8 @@ import { getStoredEvalOpsSession } from './auth'
 import type {
   EvalOpsIngestSpansRequest,
   EvalOpsIngestSpansResponse,
+  EvalOpsAnnotateTraceQualityRequest,
+  EvalOpsAnnotateTraceQualityResponse,
   EvalOpsListApprovalsRequest,
   EvalOpsListApprovalsResponse,
   EvalOpsListAgentsRequest,
@@ -15,12 +17,25 @@ import type {
   EvalOpsListTracesResponse,
   EvalOpsRecallMemoryRequest,
   EvalOpsRecallMemoryResponse,
+  EvalOpsRecordArenaTraceRequest,
+  EvalOpsRecordArenaTraceResponse,
+  EvalOpsRecordArenaVoteRequest,
   EvalOpsSearchSkillsRequest,
   EvalOpsServiceStatus,
   EvalOpsStoreMemoryRequest,
   EvalOpsStoreMemoryResponse,
+  EvalOpsTraceQualityAnnotation,
   EvalOpsTraceSpan
 } from '../../shared/ipc'
+
+const TOKENS_PER_CHAR_ESTIMATE = 0.25
+
+const MODEL_PRICING_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
+  'gpt-5.4': { input: 2.5, output: 15 },
+  'claude-sonnet-4.6': { input: 3, output: 15 },
+  'claude-opus-4.6': { input: 5, output: 25 },
+  'gemini-3.1-pro': { input: 2, output: 12 }
+}
 
 export async function listEvalOpsAgents(request: EvalOpsListAgentsRequest = {}): Promise<EvalOpsListAgentsResponse> {
   const config = getEvalOpsConfig()
@@ -129,6 +144,13 @@ export async function ingestEvalOpsSpans(request: EvalOpsIngestSpansRequest): Pr
   return client.traces.ingestSpans(request)
 }
 
+export async function annotateEvalOpsTraceQuality(
+  request: EvalOpsAnnotateTraceQualityRequest
+): Promise<EvalOpsAnnotateTraceQualityResponse> {
+  const client = await getEvalOpsConsumerClient()
+  return client.traces.annotateTraceQuality(request)
+}
+
 export async function getEvalOpsServicesStatus(): Promise<EvalOpsServiceStatus[]> {
   const config = getEvalOpsConfig()
   const checks: Array<{
@@ -194,6 +216,140 @@ export async function recordEvalOpsChatTrace(input: {
   await ingestEvalOpsSpans({ spans: [span] })
 }
 
+export async function recordEvalOpsArenaTrace(
+  input: EvalOpsRecordArenaTraceRequest
+): Promise<EvalOpsRecordArenaTraceResponse> {
+  const config = getEvalOpsConfig()
+  const session = getStoredEvalOpsSession()
+  if (!config.token && !session) {
+    return {
+      traceId: input.traceId,
+      ingestedCount: 0,
+      annotations: [],
+      offline: true,
+      reason: 'EvalOps authentication required. Sign in from Settings > EvalOps.'
+    }
+  }
+
+  const promptTokens = estimateTokens(input.prompt)
+  const rootSpan: EvalOpsTraceSpan = {
+    traceId: input.traceId,
+    spanId: input.rootSpanId,
+    workspaceId: config.workspaceId,
+    organizationId: session?.organizationId,
+    agentId: config.agentId,
+    surface: 'kestrel',
+    name: 'arena.run',
+    kind: 'arena',
+    tokenInput: promptTokens,
+    tokenOutput: input.responses.reduce((total, response) => total + estimateTokens(response.content ?? ''), 0),
+    latencyMs: durationMs(input.createdAt, input.completedAt),
+    status: input.responses.some((response) => response.error) ? 'SPAN_STATUS_ERROR' : 'SPAN_STATUS_OK',
+    attributes: cleanRecord({
+      arenaSessionId: input.sessionId,
+      responseCount: input.responses.length,
+      promptChars: input.prompt.length
+    }),
+    startedAt: input.createdAt,
+    endedAt: input.completedAt
+  }
+
+  const spans = [
+    rootSpan,
+    ...input.responses.map((response, index): EvalOpsTraceSpan => {
+      const outputTokens = estimateTokens(response.content ?? '')
+      const costUsd = estimateModelCostUsd(response.model, promptTokens, outputTokens)
+      return {
+        traceId: input.traceId,
+        spanId: response.spanId,
+        parentSpanId: input.rootSpanId,
+        workspaceId: config.workspaceId,
+        organizationId: session?.organizationId,
+        agentId: config.agentId,
+        surface: 'kestrel',
+        name: 'arena.model_response',
+        kind: 'llm',
+        model: response.model,
+        provider: providerFromModel(response.model),
+        tokenInput: promptTokens,
+        tokenOutput: outputTokens,
+        latencyMs: response.latencyMs,
+        status: response.error ? 'SPAN_STATUS_ERROR' : 'SPAN_STATUS_OK',
+        costUsd,
+        attributes: cleanRecord({
+          arenaSessionId: input.sessionId,
+          arenaResponseIndex: index,
+          modelName: response.modelName,
+          responseChars: response.content?.length ?? 0,
+          error: response.error
+        }),
+        startedAt: response.startedAt ?? input.createdAt,
+        endedAt: response.endedAt ?? input.completedAt
+      }
+    })
+  ]
+
+  const ingestResponse = await ingestEvalOpsSpans({ spans })
+  const annotations = await Promise.all(
+    input.responses.map((response) => annotateEvalOpsTraceQuality({
+      annotation: buildArenaCompletionAnnotation(input, response)
+    }))
+  )
+
+  return {
+    traceId: input.traceId,
+    ingestedCount: ingestResponse.ingestedCount,
+    annotations
+  }
+}
+
+export async function recordEvalOpsArenaVote(
+  input: EvalOpsRecordArenaVoteRequest
+): Promise<EvalOpsAnnotateTraceQualityResponse[]> {
+  const config = getEvalOpsConfig()
+  const session = getStoredEvalOpsSession()
+  if (!config.token && !session) {
+    return [{
+      offline: true,
+      reason: 'EvalOps authentication required. Sign in from Settings > EvalOps.'
+    }]
+  }
+
+  return Promise.all(input.responses.map((response) => {
+    const won = response.spanId === input.winnerSpanId
+    const annotation: EvalOpsTraceQualityAnnotation = {
+      traceId: input.traceId,
+      spanId: response.spanId,
+      compositeScore: won ? 1 : 0,
+      assertions: [{
+        assertionId: 'arena_user_vote',
+        name: 'Arena user vote',
+        passed: won,
+        score: won ? 1 : 0,
+        reason: won ? 'arena_user_vote' : 'arena_user_vote_not_selected',
+        metadata: cleanRecord({
+          arenaSessionId: input.sessionId,
+          winnerSpanId: input.winnerSpanId,
+          model: response.model,
+          modelName: response.modelName
+        })
+      }],
+      qualityPerDollar: qualityPerDollar(won ? 1 : 0, estimateModelCostUsd(response.model, 0, estimateTokens(response.content ?? ''))),
+      evalSuiteId: 'kestrel-arena-user-vote',
+      scorer: 'kestrel.arena.vote',
+      scoredAt: new Date().toISOString(),
+      metadata: cleanRecord({
+        arenaSessionId: input.sessionId,
+        model: response.model,
+        modelName: response.modelName,
+        selected: won,
+        responseChars: response.content?.length ?? 0
+      })
+    }
+    return annotateEvalOpsTraceQuality({ annotation })
+  }))
+}
+
 export async function recordEvalOpsTelemetryTrace(fields: {
   event_id: string
   event_type: string
@@ -243,6 +399,86 @@ function telemetryAttributes(fields: Record<string, unknown>): Record<string, un
     }
   }
   return attributes
+}
+
+function buildArenaCompletionAnnotation(
+  input: EvalOpsRecordArenaTraceRequest,
+  response: EvalOpsRecordArenaTraceRequest['responses'][number]
+): EvalOpsTraceQualityAnnotation {
+  const responseChars = response.content?.length ?? 0
+  const outputTokens = estimateTokens(response.content ?? '')
+  const costUsd = estimateModelCostUsd(response.model, estimateTokens(input.prompt), outputTokens)
+  const completed = !response.error && responseChars > 0
+  const score = completed ? clampScore(0.55 + Math.min(responseChars, 4_000) / 10_000) : 0
+  return {
+    traceId: input.traceId,
+    spanId: response.spanId,
+    compositeScore: score,
+    assertions: [{
+      assertionId: 'arena_response_completed',
+      name: 'Arena response completed',
+      passed: completed,
+      score,
+      reason: completed ? 'arena_response_completed' : (response.error ? 'arena_response_error' : 'arena_response_empty'),
+      metadata: cleanRecord({
+        arenaSessionId: input.sessionId,
+        model: response.model,
+        responseChars
+      })
+    }],
+    cost: costUsd > 0 ? { currencyCode: 'USD', amount: costUsd } : undefined,
+    qualityPerDollar: qualityPerDollar(score, costUsd),
+    evalSuiteId: 'kestrel-arena-comparison',
+    scorer: 'kestrel.arena.completion',
+    scoredAt: new Date().toISOString(),
+    metadata: cleanRecord({
+      arenaSessionId: input.sessionId,
+      model: response.model,
+      modelName: response.modelName,
+      promptChars: input.prompt.length,
+      responseChars,
+      scoreSource: 'response_completion_heuristic',
+      costSource: costUsd > 0 ? 'model_price_estimate' : 'unpriced'
+    })
+  }
+}
+
+function estimateTokens(text: string): number {
+  if (!text) return 0
+  return Math.max(1, Math.ceil(text.length * TOKENS_PER_CHAR_ESTIMATE))
+}
+
+function durationMs(start: string, end: string): number {
+  const value = Date.parse(end) - Date.parse(start)
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function estimateModelCostUsd(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = MODEL_PRICING_USD_PER_MILLION[normalizeModelForPricing(model)]
+  if (!pricing) return 0
+  return roundUsd((inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000)
+}
+
+function normalizeModelForPricing(model: string): string {
+  const parts = model.split('/')
+  return parts[parts.length - 1] || model
+}
+
+function providerFromModel(model: string): string {
+  return model.includes('/') ? model.split('/')[0] : 'evalops'
+}
+
+function qualityPerDollar(score: number, costUsd: number): number {
+  if (costUsd <= 0) return 0
+  return Math.round((score / costUsd) * 100) / 100
+}
+
+function clampScore(score: number): number {
+  return Math.min(1, Math.max(0, Math.round(score * 100) / 100))
+}
+
+function roundUsd(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000
 }
 
 function cleanRecord<T extends Record<string, unknown>>(record: T): T {

@@ -4,6 +4,8 @@ import type {
   AgentRegistryListResponse,
   AgentRegistryRecord,
   AgentRegistryRegisterRequest,
+  AnnotateTraceQualityRequest,
+  AnnotateTraceQualityResponse,
   ApprovalGetRequest,
   ApprovalGetResponse,
   ApprovalListPendingRequest,
@@ -160,6 +162,20 @@ export class TracesClient {
       body: request,
       signal: options?.signal,
       fallback: (reason) => ({ ingestedCount: 0, ...offline(reason) })
+    })
+  }
+
+  annotateTraceQuality(
+    request: AnnotateTraceQualityRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<AnnotateTraceQualityResponse> {
+    return this.transport.request({
+      service: 'traces',
+      operation: 'annotateTraceQuality',
+      path: '/traces.v1.SpanIngestService/AnnotateTraceQuality',
+      body: request,
+      signal: options?.signal,
+      fallback: (reason) => ({ ...offline(reason) })
     })
   }
 }

@@ -3,19 +3,26 @@ import type { AIModel } from '../../../../shared/ipc'
 import { ARENA_DEFAULT_MODELS } from '../../../../shared/config'
 
 interface ArenaResponse {
+  spanId: string
   model: string
   modelName: string
   content: string
   isStreaming: boolean
   voted: boolean
   error?: string
+  startedAt?: number
+  endedAt?: number
+  latencyMs?: number
 }
 
 interface ArenaSession {
   id: string
+  traceId: string
+  rootSpanId: string
   prompt: string
   responses: ArenaResponse[]
   createdAt: number
+  completedAt?: number
 }
 
 class ArenaStore {
@@ -56,17 +63,22 @@ class ArenaStore {
   async runArena(prompt: string) {
     if (this.isRunning || this.selectedModels.length < 2) return
 
+    const now = Date.now()
+    const sessionId = `arena-${now}`
     const session: ArenaSession = {
-      id: `arena-${Date.now()}`,
+      id: sessionId,
+      traceId: `trace-${sessionId}`,
+      rootSpanId: `span-${sessionId}-root`,
       prompt,
-      responses: this.selectedModels.map((modelId) => ({
+      responses: this.selectedModels.map((modelId, index) => ({
+        spanId: `span-${sessionId}-${index}`,
         model: modelId,
         modelName: this.availableModels.find((m) => m.id === modelId)?.name || modelId.split('/').pop() || modelId,
         content: '',
         isStreaming: true,
         voted: false
       })),
-      createdAt: Date.now()
+      createdAt: now
     }
 
     runInAction(() => {
@@ -84,7 +96,9 @@ class ArenaStore {
 
     runInAction(() => {
       this.isRunning = false
+      session.completedAt = Date.now()
     })
+    void this.recordArenaTrace(session)
   }
 
   private async streamModel(
@@ -95,6 +109,10 @@ class ArenaStore {
   ) {
     // Set up stream listeners specific to this arena response
     const tempThreadId = `arena-${session.id}-${model}`
+    const startedAt = Date.now()
+    runInAction(() => {
+      session.responses[index].startedAt = startedAt
+    })
 
     const unsubChunk = window.api.on('ai:streamChunk', ({ threadId, chunk }) => {
       if (threadId !== tempThreadId) return
@@ -106,8 +124,11 @@ class ArenaStore {
     const streamDone = new Promise<void>((resolve) => {
       const unsubEnd = window.api.on('ai:streamEnd', ({ threadId }) => {
         if (threadId !== tempThreadId) return
+        const endedAt = Date.now()
         runInAction(() => {
           session.responses[index].isStreaming = false
+          session.responses[index].endedAt = endedAt
+          session.responses[index].latencyMs = endedAt - startedAt
         })
         unsubEnd()
         resolve()
@@ -115,9 +136,12 @@ class ArenaStore {
 
       const unsubError = window.api.on('ai:streamError', ({ threadId, error }) => {
         if (threadId !== tempThreadId) return
+        const endedAt = Date.now()
         runInAction(() => {
           session.responses[index].isStreaming = false
           session.responses[index].error = error
+          session.responses[index].endedAt = endedAt
+          session.responses[index].latencyMs = endedAt - startedAt
           if (!session.responses[index].content) {
             session.responses[index].content = `Error from ${session.responses[index].modelName}: ${error}`
           }
@@ -144,6 +168,56 @@ class ArenaStore {
     if (!session) return
     for (const resp of session.responses) {
       resp.voted = resp.model === modelId
+    }
+    void this.recordArenaVote(session, modelId)
+  }
+
+  private async recordArenaTrace(session: ArenaSession) {
+    try {
+      await window.api.invoke('evalops:arena:recordTrace', {
+        sessionId: session.id,
+        traceId: session.traceId,
+        rootSpanId: session.rootSpanId,
+        prompt: session.prompt,
+        createdAt: new Date(session.createdAt).toISOString(),
+        completedAt: new Date(session.completedAt ?? Date.now()).toISOString(),
+        responses: session.responses.map((response) => ({
+          spanId: response.spanId,
+          model: response.model,
+          modelName: response.modelName,
+          content: response.content,
+          error: response.error,
+          startedAt: response.startedAt ? new Date(response.startedAt).toISOString() : undefined,
+          endedAt: response.endedAt ? new Date(response.endedAt).toISOString() : undefined,
+          latencyMs: response.latencyMs
+        }))
+      })
+    } catch (err) {
+      console.warn('[evalops:traces] Failed to record arena trace:', err)
+    }
+  }
+
+  private async recordArenaVote(session: ArenaSession, winnerModelId: string) {
+    const winner = session.responses.find((response) => response.model === winnerModelId)
+    if (!winner) return
+    try {
+      await window.api.invoke('evalops:arena:recordVote', {
+        sessionId: session.id,
+        traceId: session.traceId,
+        winnerSpanId: winner.spanId,
+        responses: session.responses.map((response) => ({
+          spanId: response.spanId,
+          model: response.model,
+          modelName: response.modelName,
+          content: response.content,
+          error: response.error,
+          startedAt: response.startedAt ? new Date(response.startedAt).toISOString() : undefined,
+          endedAt: response.endedAt ? new Date(response.endedAt).toISOString() : undefined,
+          latencyMs: response.latencyMs
+        }))
+      })
+    } catch (err) {
+      console.warn('[evalops:traces] Failed to record arena vote:', err)
     }
   }
 }

@@ -294,6 +294,31 @@ export interface TraceSpan extends JsonObject {
   endedAt?: string
 }
 
+export interface TraceAssertionResult extends JsonObject {
+  assertionId?: string
+  name?: string
+  passed?: boolean
+  score?: number
+  reason?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface TraceQualityAnnotation extends JsonObject {
+  traceId: string
+  spanId?: string
+  compositeScore?: number
+  assertions?: TraceAssertionResult[]
+  cost?: {
+    currencyCode?: string
+    amount?: number
+  }
+  qualityPerDollar?: number
+  evalSuiteId?: string
+  scoredAt?: string
+  scorer?: string
+  metadata?: Record<string, unknown>
+}
+
 export interface IngestSpansRequest extends JsonObject {
   spans: TraceSpan[]
 }
@@ -301,6 +326,16 @@ export interface IngestSpansRequest extends JsonObject {
 export interface IngestSpansResponse extends JsonObject {
   ingestedCount?: number
   traces?: unknown[]
+}
+
+export interface AnnotateTraceQualityRequest extends JsonObject {
+  annotation: TraceQualityAnnotation
+}
+
+export interface AnnotateTraceQualityResponse extends JsonObject {
+  annotation?: TraceQualityAnnotation
+  offline?: boolean
+  reason?: string
 }
 
 export interface TraceListRequest extends JsonObject {
