@@ -5,7 +5,12 @@ import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { getEvalOpsConfig } from './config'
 import { getSettingValue } from './settings'
-import { deleteEvalOpsMemory, listEvalOpsMemory, storeEvalOpsMemory } from './services'
+import {
+  deleteEvalOpsMemory,
+  listEvalOpsMemory,
+  recallEvalOpsMemory,
+  storeEvalOpsMemory
+} from './services'
 import type { EvalOpsMemory } from '../../shared/ipc'
 
 export const EVALOPS_MEMORY_SYNC_SETTING_KEY = 'evalops_memory_sync'
@@ -17,6 +22,7 @@ const QUEUE_INTERVAL_MS = 60_000
 const RETRY_BASE_MS = 30_000
 const RETRY_MAX_MS = 60 * 60_000
 const SYNCED_MEMORY_TYPES = ['chat_thread', 'meeting_summary', 'journal'] as const
+const MEMORY_RECALL_SNIPPET_CHARS = 700
 
 interface EvalOpsMemorySyncSettings {
   enabled?: boolean
@@ -141,6 +147,63 @@ export async function syncJournalEntryMemory(date: string): Promise<void> {
     confidence: 0.82,
     tags: ['kestrel', 'journal', `date:${entry.date}`]
   })
+}
+
+export async function buildEvalOpsMemoryRecallBlock(query: string): Promise<string | null> {
+  const settings = getEvalOpsMemorySyncSettings()
+  if (!settings.enabled || query.trim().length === 0) return null
+
+  const typeRequests = [
+    { enabled: settings.chat, type: 'chat_thread', label: 'chat' },
+    { enabled: settings.meetings, type: 'meeting_summary', label: 'meeting' },
+    { enabled: settings.journal, type: 'journal', label: 'journal' }
+  ].filter((item) => item.enabled)
+  if (typeRequests.length === 0) return null
+
+  const config = getEvalOpsConfig()
+  const results: Array<{ memory: EvalOpsMemory; similarity: number; label: string }> = []
+  for (const item of typeRequests) {
+    const response = await recallEvalOpsMemory({
+      query,
+      scope: 'SCOPE_USER',
+      type: item.type,
+      agentId: config.agentId,
+      topK: 3
+    })
+    if ((response as { offline?: boolean }).offline) continue
+    for (const result of response.results) {
+      if (!result.memory?.content) continue
+      results.push({
+        memory: result.memory,
+        similarity: result.similarity ?? 0,
+        label: item.label
+      })
+    }
+  }
+
+  const seen = new Set<string>()
+  const unique = results
+    .sort((a, b) => b.similarity - a.similarity)
+    .filter((result) => {
+      const key = result.memory.id ?? result.memory.content ?? ''
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, 6)
+
+  if (unique.length === 0) return null
+
+  return [
+    '<evalops_memory>',
+    'Relevant synced memories from EvalOps Memory:',
+    ...unique.map((result) => {
+      const snippet = truncateForPrompt(result.memory.content ?? '', MEMORY_RECALL_SNIPPET_CHARS)
+      const score = result.similarity > 0 ? ` score=${result.similarity.toFixed(3)}` : ''
+      return `- [${result.label}${score}] ${snippet}`
+    }),
+    '</evalops_memory>'
+  ].join('\n')
 }
 
 export function syncChatThreadMemoryInBackground(threadId: string): void {
@@ -389,6 +452,11 @@ function memoryId(kind: string, id: string): string {
 function truncateMemoryContent(content: string): string {
   const maxChars = 16_000
   return content.length > maxChars ? `${content.slice(0, maxChars)}\n...[truncated]` : content
+}
+
+function truncateForPrompt(content: string, maxChars: number): string {
+  const normalized = content.replace(/\s+/g, ' ').trim()
+  return normalized.length > maxChars ? `${normalized.slice(0, maxChars)}...[truncated]` : normalized
 }
 
 function retryDelayMs(attempts: number): number {
