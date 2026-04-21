@@ -8,6 +8,13 @@ export async function getEvalOpsConsumerClient(): Promise<EvalOpsClient> {
   const session = getStoredEvalOpsSession()
   return new EvalOpsClient({
     baseUrl: config.baseUrl,
+    serviceBaseUrls: {
+      'agent-registry': config.agentRegistryBaseUrl,
+      approvals: config.approvalsBaseUrl,
+      memory: config.memoryBaseUrl,
+      skills: config.skillsBaseUrl,
+      traces: config.tracesBaseUrl
+    },
     token,
     headers: cleanHeaders({
       'X-Organization-ID': session?.organizationId,

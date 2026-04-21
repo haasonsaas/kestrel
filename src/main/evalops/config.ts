@@ -4,6 +4,7 @@ import {
   EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL,
   EVALOPS_DEFAULT_AGENT_ID,
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
+  EVALOPS_DEFAULT_APPROVALS_BASE_URL,
   EVALOPS_DEFAULT_MEMORY_BASE_URL,
   EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
@@ -23,6 +24,7 @@ export interface EvalOpsConfig {
   token?: string
   llmGatewayBaseUrl: string
   agentRegistryBaseUrl: string
+  approvalsBaseUrl: string
   skillsBaseUrl: string
   memoryBaseUrl: string
   tracesBaseUrl: string
@@ -46,6 +48,7 @@ interface StoredEvalOpsConfig {
   token?: unknown
   llmGatewayBaseUrl?: unknown
   agentRegistryBaseUrl?: unknown
+  approvalsBaseUrl?: unknown
   skillsBaseUrl?: unknown
   memoryBaseUrl?: unknown
   tracesBaseUrl?: unknown
@@ -85,6 +88,11 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
       process.env.EVALOPS_AGENT_REGISTRY_BASE_URL,
       asString(stored.agentRegistryBaseUrl),
       EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL
+    ),
+    approvalsBaseUrl: cleanUrl(
+      process.env.EVALOPS_APPROVALS_BASE_URL,
+      asString(stored.approvalsBaseUrl),
+      EVALOPS_DEFAULT_APPROVALS_BASE_URL
     ),
     skillsBaseUrl: cleanUrl(
       process.env.EVALOPS_SKILLS_BASE_URL,

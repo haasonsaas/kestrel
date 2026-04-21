@@ -2,12 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Check, LogIn, LogOut, RefreshCw, Save } from 'lucide-react'
 import {
   EVALOPS_DEFAULT_AGENT_ID,
+  EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
+  EVALOPS_DEFAULT_APPROVALS_BASE_URL,
   EVALOPS_DEFAULT_BASE_URL,
   EVALOPS_DEFAULT_IDENTITY_BASE_URL,
   EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL,
+  EVALOPS_DEFAULT_MEMORY_BASE_URL,
   EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
+  EVALOPS_DEFAULT_SKILLS_BASE_URL,
+  EVALOPS_DEFAULT_TRACES_BASE_URL,
   EVALOPS_DEFAULT_WORKSPACE_ID
 } from '@shared/config'
 import type { EvalOpsAuthStatus, EvalOpsServiceStatus } from '@shared/ipc'
@@ -20,6 +25,7 @@ interface StoredEvalOpsConfig {
   resource?: string
   scopes?: string[]
   agentRegistryBaseUrl?: string
+  approvalsBaseUrl?: string
   skillsBaseUrl?: string
   memoryBaseUrl?: string
   tracesBaseUrl?: string
@@ -38,6 +44,11 @@ export function EvalOpsSettings() {
   const [identityBaseUrl, setIdentityBaseUrl] = useState(EVALOPS_DEFAULT_IDENTITY_BASE_URL)
   const [baseUrl, setBaseUrl] = useState(EVALOPS_DEFAULT_BASE_URL)
   const [llmGatewayBaseUrl, setLlmGatewayBaseUrl] = useState(EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL)
+  const [agentRegistryBaseUrl, setAgentRegistryBaseUrl] = useState(EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL)
+  const [approvalsBaseUrl, setApprovalsBaseUrl] = useState(EVALOPS_DEFAULT_APPROVALS_BASE_URL)
+  const [skillsBaseUrl, setSkillsBaseUrl] = useState(EVALOPS_DEFAULT_SKILLS_BASE_URL)
+  const [memoryBaseUrl, setMemoryBaseUrl] = useState(EVALOPS_DEFAULT_MEMORY_BASE_URL)
+  const [tracesBaseUrl, setTracesBaseUrl] = useState(EVALOPS_DEFAULT_TRACES_BASE_URL)
   const [token, setToken] = useState('')
   const [resource, setResource] = useState(EVALOPS_DEFAULT_RESOURCE)
   const [scopes, setScopes] = useState(EVALOPS_DEFAULT_SCOPES.join(' '))
@@ -60,6 +71,11 @@ export function EvalOpsSettings() {
     if (stored?.identityBaseUrl) setIdentityBaseUrl(stored.identityBaseUrl)
     if (stored?.baseUrl) setBaseUrl(stored.baseUrl)
     if (stored?.llmGatewayBaseUrl) setLlmGatewayBaseUrl(stored.llmGatewayBaseUrl)
+    if (stored?.agentRegistryBaseUrl) setAgentRegistryBaseUrl(stored.agentRegistryBaseUrl)
+    if (stored?.approvalsBaseUrl) setApprovalsBaseUrl(stored.approvalsBaseUrl)
+    if (stored?.skillsBaseUrl) setSkillsBaseUrl(stored.skillsBaseUrl)
+    if (stored?.memoryBaseUrl) setMemoryBaseUrl(stored.memoryBaseUrl)
+    if (stored?.tracesBaseUrl) setTracesBaseUrl(stored.tracesBaseUrl)
     if (stored?.token) setToken(stored.token)
     if (stored?.resource) setResource(stored.resource)
     if (stored?.scopes?.length) setScopes(stored.scopes.join(' '))
@@ -84,6 +100,11 @@ export function EvalOpsSettings() {
         identityBaseUrl: identityBaseUrl.trim(),
         baseUrl: baseUrl.trim(),
         llmGatewayBaseUrl: llmGatewayBaseUrl.trim(),
+        agentRegistryBaseUrl: agentRegistryBaseUrl.trim(),
+        approvalsBaseUrl: approvalsBaseUrl.trim(),
+        skillsBaseUrl: skillsBaseUrl.trim(),
+        memoryBaseUrl: memoryBaseUrl.trim(),
+        tracesBaseUrl: tracesBaseUrl.trim(),
         token: token.trim(),
         resource: resource.trim(),
         scopes: parsedScopes,
@@ -104,7 +125,25 @@ export function EvalOpsSettings() {
     } finally {
       setBusy(false)
     }
-  }, [agentId, baseUrl, identityBaseUrl, llmGatewayBaseUrl, parsedScopes, provider, providerCredentialName, providerEnvironment, providerTeamId, resource, scopes, token, workspaceId])
+  }, [
+    agentId,
+    agentRegistryBaseUrl,
+    approvalsBaseUrl,
+    baseUrl,
+    identityBaseUrl,
+    llmGatewayBaseUrl,
+    memoryBaseUrl,
+    parsedScopes,
+    provider,
+    providerCredentialName,
+    providerEnvironment,
+    providerTeamId,
+    resource,
+    skillsBaseUrl,
+    token,
+    tracesBaseUrl,
+    workspaceId
+  ])
 
   const signIn = useCallback(async () => {
     setBusy(true)
@@ -230,6 +269,39 @@ export function EvalOpsSettings() {
           placeholder={EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL}
         />
 
+        <div className="grid grid-cols-2 gap-4">
+          <TextSetting
+            label="Agent Registry URL"
+            value={agentRegistryBaseUrl}
+            onChange={setAgentRegistryBaseUrl}
+            placeholder={EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL}
+          />
+          <TextSetting
+            label="Approvals URL"
+            value={approvalsBaseUrl}
+            onChange={setApprovalsBaseUrl}
+            placeholder={EVALOPS_DEFAULT_APPROVALS_BASE_URL}
+          />
+          <TextSetting
+            label="Skills URL"
+            value={skillsBaseUrl}
+            onChange={setSkillsBaseUrl}
+            placeholder={EVALOPS_DEFAULT_SKILLS_BASE_URL}
+          />
+          <TextSetting
+            label="Memory URL"
+            value={memoryBaseUrl}
+            onChange={setMemoryBaseUrl}
+            placeholder={EVALOPS_DEFAULT_MEMORY_BASE_URL}
+          />
+          <TextSetting
+            label="Traces URL"
+            value={tracesBaseUrl}
+            onChange={setTracesBaseUrl}
+            placeholder={EVALOPS_DEFAULT_TRACES_BASE_URL}
+          />
+        </div>
+
         <TextSetting
           label="Bearer Token"
           value={token}
@@ -306,7 +378,7 @@ export function EvalOpsSettings() {
             <div>
               <h4 className="text-sm font-medium mb-1">Platform Services</h4>
               <p className="text-xs text-muted-foreground">
-                Agent registry, skills, memory, approvals, and traces are checked through the unified EvalOps platform API.
+                Agent registry, approvals, skills, memory, and traces are checked through their configured EvalOps service URLs.
               </p>
             </div>
             <button

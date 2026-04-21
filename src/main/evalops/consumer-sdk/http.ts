@@ -13,6 +13,7 @@ export interface EvalOpsTransportOptions<TFallback = unknown> {
   path: string
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  query?: Record<string, string | number | boolean | null | undefined>
   signal?: AbortSignal
   fallback?: (reason: string) => TFallback
 }
@@ -69,6 +70,7 @@ function toError(value: unknown): Error {
 export class EvalOpsTransport {
   readonly baseUrl: string
   private readonly token?: string
+  private readonly serviceBaseUrls: Partial<Record<EvalOpsServiceName, string>>
   private readonly headersOverride: Record<string, string>
   private readonly featureFlags?: FeatureFlags
   private readonly offlineFallback: boolean
@@ -80,6 +82,12 @@ export class EvalOpsTransport {
       config.baseUrl ?? getEnvValue('EVALOPS_BASE_URL') ?? DEFAULT_BASE_URL
     )
     this.token = config.token ?? getEnvValue('EVALOPS_TOKEN')
+    this.serviceBaseUrls = Object.fromEntries(
+      Object.entries(config.serviceBaseUrls ?? {})
+        .map(([service, baseUrl]) => [service, baseUrl?.trim()])
+        .filter((entry): entry is [EvalOpsServiceName, string] => Boolean(entry[1]))
+        .map(([service, baseUrl]) => [service, trimTrailingSlash(baseUrl)])
+    )
     this.headersOverride = config.headers ?? {}
     this.featureFlags = config.featureFlags
     this.offlineFallback = config.offlineFallback ?? false
@@ -116,6 +124,16 @@ export class EvalOpsTransport {
     }
   }
 
+  private requestUrl(options: EvalOpsTransportOptions<unknown>): string {
+    const baseUrl = this.serviceBaseUrls[options.service] ?? this.baseUrl
+    const url = new URL(`${baseUrl}${options.path}`)
+    for (const [key, value] of Object.entries(options.query ?? {})) {
+      if (value === undefined || value === null || value === '') continue
+      url.searchParams.set(key, String(value))
+    }
+    return url.toString()
+  }
+
   async request<TResponse>(
     options: EvalOpsTransportOptions<TResponse>
   ): Promise<TResponse> {
@@ -123,7 +141,7 @@ export class EvalOpsTransport {
     const method = options.method ?? 'POST'
 
     try {
-      const response = await this.fetchImpl(`${this.baseUrl}${options.path}`, {
+      const response = await this.fetchImpl(this.requestUrl(options), {
         method,
         headers: this.headers(),
         signal: options.signal,

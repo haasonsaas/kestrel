@@ -25,13 +25,14 @@ export const APP_VERSION = '0.6.0'
 
 // ── EvalOps Platform Defaults ──
 
-export const EVALOPS_DEFAULT_IDENTITY_BASE_URL = 'http://identity-service.evalops.svc.cluster.local:8080'
+export const EVALOPS_DEFAULT_IDENTITY_BASE_URL = 'https://identity.evalops.dev'
 export const EVALOPS_DEFAULT_BASE_URL = 'https://api.evalops.dev'
-export const EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL = 'http://llm-gateway-service.evalops.svc.cluster.local:8080/v1'
-export const EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL = 'http://agent-registry-service.evalops.svc.cluster.local:8080'
-export const EVALOPS_DEFAULT_SKILLS_BASE_URL = 'http://skills-service.evalops.svc.cluster.local:8080'
-export const EVALOPS_DEFAULT_MEMORY_BASE_URL = 'http://memory-service.evalops.svc.cluster.local:8080'
-export const EVALOPS_DEFAULT_TRACES_BASE_URL = 'http://traces-service.evalops.svc.cluster.local:8080'
+export const EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL = 'https://llm-gateway.evalops.dev/v1'
+export const EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL = 'https://agent-registry.evalops.dev'
+export const EVALOPS_DEFAULT_APPROVALS_BASE_URL = 'https://approvals.evalops.dev'
+export const EVALOPS_DEFAULT_SKILLS_BASE_URL = 'https://skills.evalops.dev'
+export const EVALOPS_DEFAULT_MEMORY_BASE_URL = 'https://memory.evalops.dev'
+export const EVALOPS_DEFAULT_TRACES_BASE_URL = 'https://traces.evalops.dev'
 export const EVALOPS_DEFAULT_RESOURCE = EVALOPS_DEFAULT_LLM_GATEWAY_BASE_URL
 export const EVALOPS_DEFAULT_WORKSPACE_ID = 'default'
 export const EVALOPS_DEFAULT_AGENT_ID = 'kestrel-desktop'
