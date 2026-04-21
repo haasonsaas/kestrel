@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { asc, eq, lte } from 'drizzle-orm'
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { getSettingValue } from './settings'
@@ -8,12 +8,27 @@ export const EVALOPS_MEMORY_SYNC_SETTING_KEY = 'evalops_memory_sync'
 
 type MemorySyncCategory = 'chat' | 'meetings' | 'journal'
 
+const QUEUE_BATCH_SIZE = 10
+const QUEUE_INTERVAL_MS = 60_000
+const RETRY_BASE_MS = 30_000
+const RETRY_MAX_MS = 60 * 60_000
+
 interface EvalOpsMemorySyncSettings {
   enabled?: boolean
   chat?: boolean
   meetings?: boolean
   journal?: boolean
 }
+
+export interface EvalOpsMemorySyncQueueStatus {
+  pending: number
+  failed: number
+  nextAttemptAt?: string
+  lastError?: string
+}
+
+let queueInterval: ReturnType<typeof setInterval> | null = null
+let queueFlushPromise: Promise<void> | null = null
 
 export function getEvalOpsMemorySyncSettings(): Required<EvalOpsMemorySyncSettings> {
   const stored = getSettingValue<EvalOpsMemorySyncSettings>(EVALOPS_MEMORY_SYNC_SETTING_KEY) ?? {}
@@ -113,26 +128,169 @@ export async function syncJournalEntryMemory(date: string): Promise<void> {
 }
 
 export function syncChatThreadMemoryInBackground(threadId: string): void {
-  void syncChatThreadMemory(threadId).catch((err) => {
+  void runMemorySyncJob('chat', threadId).catch((err) => {
     console.warn('[evalops:memory] Failed to sync chat thread:', err)
   })
 }
 
 export function syncMeetingSummaryMemoryInBackground(meetingId: string, audioPath?: string): void {
-  void syncMeetingSummaryMemory(meetingId, audioPath).catch((err) => {
+  void runMemorySyncJob('meetings', meetingId, audioPath).catch((err) => {
     console.warn('[evalops:memory] Failed to sync meeting summary:', err)
   })
 }
 
 export function syncJournalEntryMemoryInBackground(date: string): void {
-  void syncJournalEntryMemory(date).catch((err) => {
+  void runMemorySyncJob('journal', date).catch((err) => {
     console.warn('[evalops:memory] Failed to sync journal entry:', err)
   })
+}
+
+export function startEvalOpsMemorySyncQueue(): void {
+  if (queueInterval) return
+  void flushEvalOpsMemorySyncQueue().catch((err) => {
+    console.warn('[evalops:memory] Failed to flush queued memory syncs:', err)
+  })
+  queueInterval = setInterval(() => {
+    void flushEvalOpsMemorySyncQueue().catch((err) => {
+      console.warn('[evalops:memory] Failed to flush queued memory syncs:', err)
+    })
+  }, QUEUE_INTERVAL_MS)
+}
+
+export function stopEvalOpsMemorySyncQueue(): void {
+  if (!queueInterval) return
+  clearInterval(queueInterval)
+  queueInterval = null
+}
+
+export function getEvalOpsMemorySyncQueueStatus(): EvalOpsMemorySyncQueueStatus {
+  const db = getDatabase()
+  const jobs = db.select().from(schema.evalopsMemorySyncQueue).all()
+  const nextJob = jobs
+    .filter((job) => job.nextAttemptAt instanceof Date)
+    .sort((a, b) => a.nextAttemptAt.getTime() - b.nextAttemptAt.getTime())[0]
+  const lastFailure = jobs
+    .filter((job) => Boolean(job.lastError))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0]
+
+  return {
+    pending: jobs.length,
+    failed: jobs.filter((job) => job.attempts > 0).length,
+    nextAttemptAt: nextJob?.nextAttemptAt.toISOString(),
+    lastError: lastFailure?.lastError ?? undefined
+  }
+}
+
+export async function flushEvalOpsMemorySyncQueue(options: { force?: boolean } = {}): Promise<void> {
+  if (queueFlushPromise) return queueFlushPromise
+  queueFlushPromise = drainEvalOpsMemorySyncQueue(options.force === true).finally(() => {
+    queueFlushPromise = null
+  })
+  return queueFlushPromise
+}
+
+async function drainEvalOpsMemorySyncQueue(force: boolean): Promise<void> {
+  const db = getDatabase()
+  const jobs = force
+    ? db.select()
+      .from(schema.evalopsMemorySyncQueue)
+      .orderBy(asc(schema.evalopsMemorySyncQueue.nextAttemptAt))
+      .limit(QUEUE_BATCH_SIZE)
+      .all()
+    : db.select()
+      .from(schema.evalopsMemorySyncQueue)
+      .where(lte(schema.evalopsMemorySyncQueue.nextAttemptAt, new Date()))
+      .orderBy(asc(schema.evalopsMemorySyncQueue.nextAttemptAt))
+      .limit(QUEUE_BATCH_SIZE)
+      .all()
+
+  for (const job of jobs) {
+    try {
+      await runMemorySyncJob(job.category as MemorySyncCategory, job.itemId, job.audioPath ?? undefined)
+    } catch (err) {
+      console.warn('[evalops:memory] Queued memory sync still failing:', err)
+    }
+  }
+}
+
+async function runMemorySyncJob(category: MemorySyncCategory, itemId: string, audioPath?: string): Promise<void> {
+  try {
+    switch (category) {
+      case 'chat':
+        await syncChatThreadMemory(itemId)
+        break
+      case 'meetings':
+        await syncMeetingSummaryMemory(itemId, audioPath)
+        break
+      case 'journal':
+        await syncJournalEntryMemory(itemId)
+        break
+    }
+    removeQueuedMemorySync(category, itemId)
+  } catch (err) {
+    queueMemorySyncFailure(category, itemId, audioPath, errorMessage(err))
+    throw err
+  }
+}
+
+function queueMemorySyncFailure(
+  category: MemorySyncCategory,
+  itemId: string,
+  audioPath: string | undefined,
+  lastError: string
+): void {
+  const db = getDatabase()
+  const id = queueId(category, itemId)
+  const now = new Date()
+  const existing = db.select()
+    .from(schema.evalopsMemorySyncQueue)
+    .where(eq(schema.evalopsMemorySyncQueue.id, id))
+    .get()
+  const attempts = (existing?.attempts ?? 0) + 1
+  const nextAttemptAt = new Date(now.getTime() + retryDelayMs(attempts))
+  const queuedAudioPath = audioPath ?? existing?.audioPath ?? null
+
+  db.insert(schema.evalopsMemorySyncQueue)
+    .values({
+      id,
+      category,
+      itemId,
+      audioPath: queuedAudioPath,
+      attempts,
+      lastError,
+      nextAttemptAt,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    })
+    .onConflictDoUpdate({
+      target: schema.evalopsMemorySyncQueue.id,
+      set: {
+        category,
+        itemId,
+        audioPath: queuedAudioPath,
+        attempts,
+        lastError,
+        nextAttemptAt,
+        updatedAt: now
+      }
+    })
+    .run()
+}
+
+function removeQueuedMemorySync(category: MemorySyncCategory, itemId: string): void {
+  getDatabase()
+    .delete(schema.evalopsMemorySyncQueue)
+    .where(eq(schema.evalopsMemorySyncQueue.id, queueId(category, itemId)))
+    .run()
 }
 
 function isMemorySyncEnabled(category: MemorySyncCategory): boolean {
   const settings = getEvalOpsMemorySyncSettings()
   return settings.enabled && settings[category]
+}
+
+function queueId(category: MemorySyncCategory, itemId: string): string {
+  return `${category}:${itemId}`
 }
 
 function memoryId(kind: string, id: string): string {
@@ -142,4 +300,12 @@ function memoryId(kind: string, id: string): string {
 function truncateMemoryContent(content: string): string {
   const maxChars = 16_000
   return content.length > maxChars ? `${content.slice(0, maxChars)}\n...[truncated]` : content
+}
+
+function retryDelayMs(attempts: number): number {
+  return Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 7))
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }

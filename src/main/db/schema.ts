@@ -43,6 +43,18 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull()
 })
 
+export const evalopsMemorySyncQueue = sqliteTable('evalops_memory_sync_queue', {
+  id: text('id').primaryKey(),
+  category: text('category', { enum: ['chat', 'meetings', 'journal'] }).notNull(),
+  itemId: text('item_id').notNull(),
+  audioPath: text('audio_path'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+})
+
 export const privacyRules = sqliteTable('privacy_rules', {
   id: text('id').primaryKey(),
   type: text('type', { enum: ['app', 'domain', 'category'] }).notNull(),

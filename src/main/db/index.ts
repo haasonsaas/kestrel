@@ -66,6 +66,18 @@ export function initDatabase(): typeof db {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS evalops_memory_sync_queue (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL CHECK(category IN ('chat', 'meetings', 'journal')),
+      item_id TEXT NOT NULL,
+      audio_path TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      next_attempt_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS privacy_rules (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL CHECK(type IN ('app', 'domain', 'category')),
@@ -102,6 +114,8 @@ export function initDatabase(): typeof db {
     CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
     CREATE INDEX IF NOT EXISTS idx_context_snapshots_date ON context_snapshots(created_at);
     CREATE INDEX IF NOT EXISTS idx_arena_responses_arena ON arena_responses(arena_id);
+    CREATE INDEX IF NOT EXISTS idx_evalops_memory_sync_queue_next_attempt
+      ON evalops_memory_sync_queue(next_attempt_at);
   `)
 
   return db
