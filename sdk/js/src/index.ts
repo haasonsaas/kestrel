@@ -7,6 +7,7 @@ export interface EvalOpsServiceEndpoints {
   skillsBaseUrl?: string
   memoryBaseUrl?: string
   tracesBaseUrl?: string
+  approvalsBaseUrl?: string
   llmGatewayBaseUrl?: string
 }
 
