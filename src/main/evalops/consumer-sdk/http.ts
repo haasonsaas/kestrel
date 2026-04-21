@@ -48,6 +48,7 @@ function createEmptyMetrics(): EvalOpsClientMetrics {
       'llm-gateway': 0,
       memory: 0,
       meter: 0,
+      prompts: 0,
       skills: 0,
       traces: 0
     }

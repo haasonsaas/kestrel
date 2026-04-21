@@ -2,6 +2,7 @@ export type EvalOpsServiceName =
   | 'llm-gateway'
   | 'meter'
   | 'approvals'
+  | 'prompts'
   | 'memory'
   | 'traces'
   | 'agent-registry'
@@ -118,6 +119,29 @@ export interface SkillListRequest extends JsonObject {
 export interface SkillListResponse extends JsonObject {
   skills: SkillRecord[]
   total?: number
+  offline?: boolean
+  reason?: string
+}
+
+export interface PromptVersionRecord extends JsonObject {
+  id?: string
+  promptId?: string
+  prompt_id?: string
+  version?: number
+  content?: string
+  model?: string
+  hash?: string
+  author?: string
+  variables?: string[]
+}
+
+export interface PromptResolveRequest extends JsonObject {
+  name: string
+  label?: string
+}
+
+export interface PromptResolveResponse extends JsonObject {
+  version?: PromptVersionRecord
   offline?: boolean
   reason?: string
 }

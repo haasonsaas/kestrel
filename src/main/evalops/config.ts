@@ -6,6 +6,7 @@ import {
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
   EVALOPS_DEFAULT_APPROVALS_BASE_URL,
   EVALOPS_DEFAULT_MEMORY_BASE_URL,
+  EVALOPS_DEFAULT_PROMPTS_BASE_URL,
   EVALOPS_DEFAULT_PROVIDER_REF,
   EVALOPS_DEFAULT_RESOURCE,
   EVALOPS_DEFAULT_SCOPES,
@@ -25,6 +26,7 @@ export interface EvalOpsConfig {
   llmGatewayBaseUrl: string
   agentRegistryBaseUrl: string
   approvalsBaseUrl: string
+  promptsBaseUrl: string
   skillsBaseUrl: string
   memoryBaseUrl: string
   tracesBaseUrl: string
@@ -49,6 +51,7 @@ interface StoredEvalOpsConfig {
   llmGatewayBaseUrl?: unknown
   agentRegistryBaseUrl?: unknown
   approvalsBaseUrl?: unknown
+  promptsBaseUrl?: unknown
   skillsBaseUrl?: unknown
   memoryBaseUrl?: unknown
   tracesBaseUrl?: unknown
@@ -93,6 +96,12 @@ export function getEvalOpsConfig(overrides: Partial<EvalOpsConfig> = {}): EvalOp
       process.env.EVALOPS_APPROVALS_BASE_URL,
       asString(stored.approvalsBaseUrl),
       EVALOPS_DEFAULT_APPROVALS_BASE_URL
+    ),
+    promptsBaseUrl: cleanUrl(
+      process.env.EVALOPS_PROMPTS_BASE_URL,
+      process.env.KESTREL_PROMPTS_BASE,
+      asString(stored.promptsBaseUrl),
+      EVALOPS_DEFAULT_PROMPTS_BASE_URL
     ),
     skillsBaseUrl: cleanUrl(
       process.env.EVALOPS_SKILLS_BASE_URL,

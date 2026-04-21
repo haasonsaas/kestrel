@@ -11,6 +11,7 @@ export async function getEvalOpsConsumerClient(): Promise<EvalOpsClient> {
     serviceBaseUrls: {
       'agent-registry': config.agentRegistryBaseUrl,
       approvals: config.approvalsBaseUrl,
+      prompts: config.promptsBaseUrl,
       memory: config.memoryBaseUrl,
       skills: config.skillsBaseUrl,
       traces: config.tracesBaseUrl

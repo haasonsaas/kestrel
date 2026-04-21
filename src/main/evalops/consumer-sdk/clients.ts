@@ -19,6 +19,8 @@ import type {
   MemoryRecord,
   MemoryStoreResponse,
   MeterWideEvent,
+  PromptResolveRequest,
+  PromptResolveResponse,
   SkillListRequest,
   SkillListResponse,
   SkillRecord,
@@ -261,6 +263,27 @@ export class SkillsClient {
       operation: 'get',
       path: '/skills.v1.SkillService/Get',
       body: { skillId },
+      signal: options?.signal,
+      fallback: (reason) => ({ ...offline(reason) })
+    })
+  }
+}
+
+export class PromptsClient {
+  constructor(private readonly transport: EvalOpsTransport) {}
+
+  resolve(
+    request: PromptResolveRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<PromptResolveResponse> {
+    return this.transport.request({
+      service: 'prompts',
+      operation: 'resolve',
+      path: '/prompts.v1.PromptService/Resolve',
+      body: {
+        name: request.name,
+        label: request.label
+      },
       signal: options?.signal,
       fallback: (reason) => ({ ...offline(reason) })
     })
