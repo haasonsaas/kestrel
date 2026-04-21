@@ -71,18 +71,6 @@ export function redactPiiForPlatform(
   return result
 }
 
-export function mergePiiSummaries(...summaries: Array<PiiRedactionSummary | null | undefined>): PiiRedactionSummary {
-  const merged = cloneSummary()
-  for (const summary of summaries) {
-    if (!summary) continue
-    merged.total += summary.total
-    for (const kind of Object.keys(merged.byKind) as PiiKind[]) {
-      merged.byKind[kind] += summary.byKind[kind] ?? 0
-    }
-  }
-  return merged
-}
-
 export function hasPiiRedactions(summary: PiiRedactionSummary | null | undefined): boolean {
   return Boolean(summary && summary.total > 0)
 }

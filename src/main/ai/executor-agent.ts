@@ -241,7 +241,7 @@ async function processToolCalls(
         result.toolName,
         result.serverName,
         result.success,
-        result.success ? undefined : result.result
+        result.success ? undefined : redactedResult
       )
 
       // Append tool result to conversation
