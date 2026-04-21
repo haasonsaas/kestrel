@@ -25,6 +25,7 @@ export async function registerKestrelAgent(): Promise<void> {
   const client = await getEvalOpsConsumerClient()
 
   const response = await client.agentRegistry.register({
+    id: config.agentId,
     workspaceId: config.workspaceId,
     name: `${APP_NAME} Desktop`,
     description: 'Context-aware AI desktop assistant for macOS.',

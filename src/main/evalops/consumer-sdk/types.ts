@@ -79,6 +79,7 @@ export interface AgentRegistryListRequest extends JsonObject {
 }
 
 export interface AgentRegistryRegisterRequest extends JsonObject {
+  id?: string
   workspaceId?: string
   name: string
   description?: string

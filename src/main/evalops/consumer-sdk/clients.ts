@@ -238,6 +238,7 @@ export class AgentRegistryClient {
       operation: 'register',
       path: '/agents.v1.AgentService/Register',
       body: {
+        id: agent.id,
         workspaceId: agent.workspaceId,
         name: agent.name,
         description: agent.description,
