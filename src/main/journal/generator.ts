@@ -1,6 +1,7 @@
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { chatCompletion } from '../ai/llm-gateway'
+import { redactPiiForPlatform } from '../privacy/pii'
 import { INTERNAL_MODEL } from '../../shared/config'
 
 export async function generateJournal(date: string): Promise<{
@@ -33,15 +34,17 @@ export async function generateJournal(date: string): Promise<{
     })
 
   // Build context summary
-  const contextSummary = snapshots
+  const contextSummaryRaw = snapshots
     .map((s) => `[${s.appName}] ${s.windowTitle || ''} ${s.url || ''}`)
     .filter(Boolean)
     .slice(0, 100)
     .join('\n')
+  const contextSummary = redactPiiForPlatform(contextSummaryRaw, 'journal_context_summary').text
 
-  const meetingSummary = meetings
+  const meetingSummaryRaw = meetings
     .map((m) => `Meeting: ${m.title} (${m.app})${m.summary ? ' - ' + m.summary.slice(0, 200) : ''}`)
     .join('\n')
+  const meetingSummary = redactPiiForPlatform(meetingSummaryRaw, 'journal_meeting_summary').text
 
   const prompt = `You are a personal journal generator. Based on the following activity data from ${date}, generate a reflective daily journal entry.
 

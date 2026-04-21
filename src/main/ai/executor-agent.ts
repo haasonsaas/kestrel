@@ -25,6 +25,7 @@ import {
   type ContextPromptResult
 } from './context-builder'
 import { WideEvent } from '../observability/wide-event'
+import { redactPiiForPlatform } from '../privacy/pii'
 import type { ContextKitClient } from '../native/contextkit-client'
 import type { MCPServerManager } from '../mcp/manager'
 
@@ -230,6 +231,11 @@ async function processToolCalls(
       )
 
       const result = await executeTool(tc.id, tc.function.name, tc.function.arguments)
+      const redactedResult = redactPiiForPlatform(result.result, 'mcp_tool_result', {
+        server_name: result.serverName,
+        tool_name: result.toolName,
+        success: result.success
+      }).text
 
       callbacks.onToolEnd(
         result.toolName,
@@ -241,7 +247,7 @@ async function processToolCalls(
       // Append tool result to conversation
       messages.push({
         role: 'tool',
-        content: result.result,
+        content: redactedResult,
         tool_call_id: tc.id
       })
 
