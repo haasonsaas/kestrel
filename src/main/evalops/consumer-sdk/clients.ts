@@ -3,8 +3,12 @@ import type {
   AgentRegistryListRequest,
   AgentRegistryListResponse,
   AgentRegistryRecord,
+  ApprovalGetRequest,
+  ApprovalGetResponse,
   ApprovalListPendingRequest,
   ApprovalListPendingResponse,
+  ApprovalRequestApprovalRequest,
+  ApprovalRequestApprovalResponse,
   IngestSpansRequest,
   IngestSpansResponse,
   JsonObject,
@@ -81,6 +85,34 @@ export class MemoryClient {
 
 export class ApprovalsClient {
   constructor(private readonly transport: EvalOpsTransport) {}
+
+  requestApproval(
+    request: ApprovalRequestApprovalRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<ApprovalRequestApprovalResponse> {
+    return this.transport.request({
+      service: 'approvals',
+      operation: 'requestApproval',
+      path: '/approvals.v1.ApprovalService/RequestApproval',
+      body: request,
+      signal: options?.signal,
+      fallback: (reason) => ({ ...offline(reason) })
+    })
+  }
+
+  getApproval(
+    request: ApprovalGetRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<ApprovalGetResponse> {
+    return this.transport.request({
+      service: 'approvals',
+      operation: 'getApproval',
+      path: '/approvals.v1.ApprovalService/GetApproval',
+      body: request,
+      signal: options?.signal,
+      fallback: (reason) => ({ ...offline(reason) })
+    })
+  }
 
   listPending(
     request: ApprovalListPendingRequest = {},
