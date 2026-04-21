@@ -16,7 +16,7 @@ const KESTREL_CAPABILITIES = [
 
 const KESTREL_SURFACES = ['kestrel', 'desktop', 'chat', 'mcp', 'meetings']
 
-export async function registerKestrelAgent(reason: 'startup' | 'login' = 'startup'): Promise<void> {
+export async function registerKestrelAgent(): Promise<void> {
   const status = await getEvalOpsAuthStatus()
   if (!status.authenticated && !status.tokenConfigured) return
 
@@ -39,8 +39,8 @@ export async function registerKestrelAgent(reason: 'startup' | 'login' = 'startu
   }
 }
 
-export function registerKestrelAgentInBackground(reason: 'startup' | 'login' = 'startup'): void {
-  registerKestrelAgent(reason).catch((err) => {
+export function registerKestrelAgentInBackground(): void {
+  registerKestrelAgent().catch((err) => {
     console.warn('[evalops:registration] Agent registration failed:', err)
   })
 }
