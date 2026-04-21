@@ -21,6 +21,7 @@ export type FeatureFlags = Record<string, FeatureFlagValue>
 
 export interface EvalOpsClientConfig {
   baseUrl?: string
+  serviceBaseUrls?: Partial<Record<EvalOpsServiceName, string>>
   token?: string
   headers?: Record<string, string>
   featureFlags?: FeatureFlags
@@ -47,13 +48,19 @@ export interface OfflineFallbackMarker {
 
 export interface AgentRegistryRecord extends JsonObject {
   id?: string
+  workspace_id?: string
   workspaceId?: string
+  organization_id?: string
+  organizationId?: string
   name?: string
   description?: string
+  agent_type?: string
   agentType?: string
   capabilities?: string[]
+  surface?: string
   surfaces?: string[]
   status?: string
+  metadata?: Record<string, string>
   activeConfigVersion?: number
   ownerId?: string
   version?: string
@@ -68,6 +75,16 @@ export interface AgentRegistryListRequest extends JsonObject {
   status?: string
   limit?: number
   offset?: number
+}
+
+export interface AgentRegistryRegisterRequest extends JsonObject {
+  workspaceId?: string
+  name: string
+  description?: string
+  agentType: string
+  capabilities: string[]
+  surfaces: string[]
+  ownerId?: string
 }
 
 export interface AgentRegistryListResponse extends JsonObject {

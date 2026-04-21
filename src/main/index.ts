@@ -107,7 +107,7 @@ if (!gotSingleInstanceLock) {
   registerMCPHandlers(mcpManager)
   registerPermissionHandlers()
   registerEvalOpsHandlers()
-  registerKestrelAgentInBackground('startup')
+  registerKestrelAgentInBackground()
   registerUpdateHandlers()
 
   // Context IPC handlers

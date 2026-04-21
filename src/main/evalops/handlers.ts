@@ -28,7 +28,7 @@ export function registerEvalOpsHandlers(): void {
   ipcMain.handle('evalops:authStatus', async () => getEvalOpsAuthStatus())
   ipcMain.handle('evalops:login', async (_event, options?: EvalOpsLoginOptions) => {
     const status = await loginEvalOps(options)
-    if (status.authenticated) registerKestrelAgentInBackground('login')
+    if (status.authenticated) registerKestrelAgentInBackground()
     return status
   })
   ipcMain.handle('evalops:logout', async () => logoutEvalOps())

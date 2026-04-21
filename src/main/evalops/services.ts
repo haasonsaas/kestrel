@@ -136,11 +136,11 @@ export async function getEvalOpsServicesStatus(): Promise<EvalOpsServiceStatus[]
     baseUrl: string
     run: () => Promise<unknown>
   }> = [
-    { service: 'agent-registry', baseUrl: config.baseUrl, run: () => listEvalOpsAgents({ limit: 1 }) },
-    { service: 'skills', baseUrl: config.baseUrl, run: () => listEvalOpsSkills({ limit: 1 }) },
-    { service: 'memory', baseUrl: config.baseUrl, run: () => recallEvalOpsMemory({ query: 'kestrel', topK: 1 }) },
-    { service: 'approvals', baseUrl: config.baseUrl, run: () => listEvalOpsApprovals({ limit: 1 }) },
-    { service: 'traces', baseUrl: config.baseUrl, run: () => listEvalOpsTraces({ limit: 1 }) }
+    { service: 'agent-registry', baseUrl: config.agentRegistryBaseUrl, run: () => listEvalOpsAgents({ limit: 1 }) },
+    { service: 'skills', baseUrl: config.skillsBaseUrl, run: () => listEvalOpsSkills({ limit: 1 }) },
+    { service: 'memory', baseUrl: config.memoryBaseUrl, run: () => recallEvalOpsMemory({ query: 'kestrel', topK: 1 }) },
+    { service: 'approvals', baseUrl: config.approvalsBaseUrl, run: () => listEvalOpsApprovals({ limit: 1 }) },
+    { service: 'traces', baseUrl: config.tracesBaseUrl, run: () => listEvalOpsTraces({ limit: 1 }) }
   ]
 
   return Promise.all(checks.map(async (check) => {

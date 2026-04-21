@@ -3,6 +3,7 @@ import type {
   AgentRegistryListRequest,
   AgentRegistryListResponse,
   AgentRegistryRecord,
+  AgentRegistryRegisterRequest,
   ApprovalGetRequest,
   ApprovalGetResponse,
   ApprovalListPendingRequest,
@@ -171,26 +172,53 @@ export class AgentRegistryClient {
     return this.transport.request({
       service: 'agent-registry',
       operation: 'list',
-      path: '/agent-registry.v1.AgentRegistryService/ListAgents',
-      body: request,
+      path: '/agents.v1.AgentService/List',
+      body: normalizeAgentListRequest(request),
       signal: options?.signal,
-      fallback: (reason) => ({ agents: [], ...offline(reason) })
+      fallback: (reason) => ({ agents: [], total: 0, ...offline(reason) })
     })
   }
 
   register(
-    agent: AgentRegistryRecord,
+    agent: AgentRegistryRegisterRequest,
     options?: { signal?: AbortSignal }
   ): Promise<{ agent?: AgentRegistryRecord; offline?: boolean; reason?: string }> {
     return this.transport.request({
       service: 'agent-registry',
       operation: 'register',
-      path: '/agent-registry.v1.AgentRegistryService/RegisterAgent',
-      body: agent,
+      path: '/agents.v1.AgentService/Register',
+      body: {
+        workspaceId: agent.workspaceId,
+        name: agent.name,
+        description: agent.description,
+        agentType: agent.agentType,
+        capabilities: agent.capabilities,
+        surfaces: agent.surfaces,
+        ownerId: agent.ownerId
+      },
       signal: options?.signal,
       fallback: (reason) => ({ ...offline(reason) })
     })
   }
+}
+
+function normalizeAgentListRequest(request: AgentRegistryListRequest): Record<string, unknown> {
+  return {
+    workspaceId: request.workspaceId,
+    agentType: request.agentType,
+    capability: request.capability,
+    surface: request.surface,
+    status: normalizeAgentStatus(request.status),
+    limit: request.limit,
+    offset: request.offset
+  }
+}
+
+function normalizeAgentStatus(status: string | undefined): string | undefined {
+  if (!status) return undefined
+  const normalized = status.trim().toUpperCase().replace(/[-\s]+/gu, '_')
+  if (!normalized) return undefined
+  return normalized.startsWith('AGENT_STATUS_') ? normalized : `AGENT_STATUS_${normalized}`
 }
 
 export class SkillsClient {
