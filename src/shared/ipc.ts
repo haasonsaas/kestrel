@@ -12,6 +12,8 @@ export type IpcChannels = {
   'evalops:logout': { args: []; return: EvalOpsAuthStatus }
   'evalops:refreshAuth': { args: []; return: EvalOpsAuthStatus }
   'evalops:servicesStatus': { args: []; return: EvalOpsServiceStatus[] }
+  'evalops:memorySync:status': { args: []; return: EvalOpsMemorySyncQueueStatus }
+  'evalops:memorySync:flush': { args: []; return: EvalOpsMemorySyncQueueStatus }
   'evalops:agents:list': { args: [request?: EvalOpsListAgentsRequest]; return: EvalOpsListAgentsResponse }
   'evalops:skills:list': { args: [request?: EvalOpsListSkillsRequest]; return: EvalOpsListSkillsResponse }
   'evalops:skills:search': { args: [request: EvalOpsSearchSkillsRequest]; return: EvalOpsListSkillsResponse }
@@ -397,6 +399,13 @@ export interface EvalOpsRecallMemoryResponse {
 
 export interface EvalOpsStoreMemoryResponse {
   memory?: EvalOpsMemory
+}
+
+export interface EvalOpsMemorySyncQueueStatus {
+  pending: number
+  failed: number
+  nextAttemptAt?: string
+  lastError?: string
 }
 
 export interface EvalOpsApprovalRequest {

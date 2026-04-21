@@ -15,7 +15,7 @@ import {
   EVALOPS_DEFAULT_TRACES_BASE_URL,
   EVALOPS_DEFAULT_WORKSPACE_ID
 } from '@shared/config'
-import type { EvalOpsAuthStatus, EvalOpsServiceStatus } from '@shared/ipc'
+import type { EvalOpsAuthStatus, EvalOpsMemorySyncQueueStatus, EvalOpsServiceStatus } from '@shared/ipc'
 
 interface StoredEvalOpsConfig {
   identityBaseUrl?: string
@@ -71,6 +71,7 @@ export function EvalOpsSettings() {
   const [memorySyncChat, setMemorySyncChat] = useState(false)
   const [memorySyncMeetings, setMemorySyncMeetings] = useState(false)
   const [memorySyncJournal, setMemorySyncJournal] = useState(false)
+  const [memoryQueueStatus, setMemoryQueueStatus] = useState<EvalOpsMemorySyncQueueStatus | null>(null)
   const [serviceStatuses, setServiceStatuses] = useState<EvalOpsServiceStatus[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -103,6 +104,7 @@ export function EvalOpsSettings() {
     setMemorySyncChat(memorySync?.chat === true)
     setMemorySyncMeetings(memorySync?.meetings === true)
     setMemorySyncJournal(memorySync?.journal === true)
+    setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:status'))
     setStatus(await window.api.invoke('evalops:authStatus'))
   }, [])
 
@@ -141,6 +143,11 @@ export function EvalOpsSettings() {
         meetings: memorySyncMeetings,
         journal: memorySyncJournal
       })
+      if (memorySyncEnabled) {
+        setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:flush'))
+      } else {
+        setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:status'))
+      }
       setStatus(await window.api.invoke('evalops:authStatus'))
       setMessage('Saved EvalOps settings.')
       setTimeout(() => setMessage(null), 2000)
@@ -227,6 +234,18 @@ export function EvalOpsSettings() {
       setBusy(false)
     }
   }, [saveConfig])
+
+  const retryMemorySyncQueue = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:flush'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }, [])
 
   return (
     <div>
@@ -434,6 +453,35 @@ export function EvalOpsSettings() {
                 disabled={!memorySyncEnabled}
               />
             </div>
+            {memoryQueueStatus && (
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {memoryQueueStatus.pending === 0
+                      ? 'No queued syncs'
+                      : `${memoryQueueStatus.pending} queued sync${memoryQueueStatus.pending === 1 ? '' : 's'}`}
+                  </p>
+                  {memoryQueueStatus.nextAttemptAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Next retry {new Date(memoryQueueStatus.nextAttemptAt).toLocaleString()}.
+                    </p>
+                  )}
+                  {memoryQueueStatus.lastError && (
+                    <p className="text-xs text-red-600 mt-1 truncate">
+                      {memoryQueueStatus.lastError}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={retryMemorySyncQueue}
+                  disabled={busy || memoryQueueStatus.pending === 0 || !memorySyncEnabled}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

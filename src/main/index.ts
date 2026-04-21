@@ -27,6 +27,7 @@ import { MCPServerManager } from './mcp/manager'
 import { registerMCPHandlers } from './mcp/handlers'
 import { registerEvalOpsHandlers } from './evalops/handlers'
 import { registerKestrelAgentInBackground } from './evalops/registration'
+import { startEvalOpsMemorySyncQueue, stopEvalOpsMemorySyncQueue } from './evalops/memory-sync'
 import { registerUpdateHandlers } from './updates'
 import { registerKeyboardShortcutHandlers, unregisterKeyboardShortcuts } from './shortcuts'
 import { registerPlatformNotificationHandlers, unregisterPlatformNotificationHandlers } from './platform-notifications'
@@ -108,6 +109,7 @@ if (!gotSingleInstanceLock) {
   registerPermissionHandlers()
   registerEvalOpsHandlers()
   registerKestrelAgentInBackground()
+  startEvalOpsMemorySyncQueue()
   registerUpdateHandlers()
 
   // Context IPC handlers
@@ -276,6 +278,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterKeyboardShortcuts()
   unregisterPlatformNotificationHandlers()
+  stopEvalOpsMemorySyncQueue()
   contextKit?.shutdown()
   mcpManager.stopAll()
   tray?.destroy()

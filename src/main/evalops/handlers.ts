@@ -2,6 +2,10 @@ import { ipcMain } from 'electron'
 import { getEvalOpsAuthStatus, loginEvalOps, logoutEvalOps } from './auth'
 import { registerKestrelAgentInBackground } from './registration'
 import {
+  flushEvalOpsMemorySyncQueue,
+  getEvalOpsMemorySyncQueueStatus
+} from './memory-sync'
+import {
   annotateEvalOpsTraceQuality,
   getEvalOpsServicesStatus,
   ingestEvalOpsSpans,
@@ -34,12 +38,22 @@ export function registerEvalOpsHandlers(): void {
   ipcMain.handle('evalops:authStatus', async () => getEvalOpsAuthStatus())
   ipcMain.handle('evalops:login', async (_event, options?: EvalOpsLoginOptions) => {
     const status = await loginEvalOps(options)
-    if (status.authenticated) registerKestrelAgentInBackground()
+    if (status.authenticated) {
+      registerKestrelAgentInBackground()
+      void flushEvalOpsMemorySyncQueue({ force: true }).catch((err) => {
+        console.warn('[evalops:memory] Failed to flush queued memory syncs after login:', err)
+      })
+    }
     return status
   })
   ipcMain.handle('evalops:logout', async () => logoutEvalOps())
   ipcMain.handle('evalops:refreshAuth', async () => getEvalOpsAuthStatus())
   ipcMain.handle('evalops:servicesStatus', async () => getEvalOpsServicesStatus())
+  ipcMain.handle('evalops:memorySync:status', async () => getEvalOpsMemorySyncQueueStatus())
+  ipcMain.handle('evalops:memorySync:flush', async () => {
+    await flushEvalOpsMemorySyncQueue({ force: true })
+    return getEvalOpsMemorySyncQueueStatus()
+  })
   ipcMain.handle('evalops:agents:list', async (_event, request?: EvalOpsListAgentsRequest) => {
     return listEvalOpsAgents(request)
   })
