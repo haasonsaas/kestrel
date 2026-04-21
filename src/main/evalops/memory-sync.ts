@@ -1,8 +1,12 @@
 import { asc, eq, lte } from 'drizzle-orm'
+import { dialog } from 'electron'
+import fs from 'fs/promises'
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
+import { getEvalOpsConfig } from './config'
 import { getSettingValue } from './settings'
-import { storeEvalOpsMemory } from './services'
+import { deleteEvalOpsMemory, listEvalOpsMemory, storeEvalOpsMemory } from './services'
+import type { EvalOpsMemory } from '../../shared/ipc'
 
 export const EVALOPS_MEMORY_SYNC_SETTING_KEY = 'evalops_memory_sync'
 
@@ -12,6 +16,7 @@ const QUEUE_BATCH_SIZE = 10
 const QUEUE_INTERVAL_MS = 60_000
 const RETRY_BASE_MS = 30_000
 const RETRY_MAX_MS = 60 * 60_000
+const SYNCED_MEMORY_TYPES = ['chat_thread', 'meeting_summary', 'journal'] as const
 
 interface EvalOpsMemorySyncSettings {
   enabled?: boolean
@@ -25,6 +30,17 @@ export interface EvalOpsMemorySyncQueueStatus {
   failed: number
   nextAttemptAt?: string
   lastError?: string
+}
+
+export interface EvalOpsMemorySyncExportResponse {
+  cancelled?: boolean
+  filePath?: string
+  count: number
+}
+
+export interface EvalOpsMemorySyncWipeResponse {
+  deleted: number
+  failed: Array<{ id: string; error: string }>
 }
 
 let queueInterval: ReturnType<typeof setInterval> | null = null
@@ -189,6 +205,48 @@ export async function flushEvalOpsMemorySyncQueue(options: { force?: boolean } =
   return queueFlushPromise
 }
 
+export async function exportEvalOpsMemorySyncCloudCopy(): Promise<EvalOpsMemorySyncExportResponse> {
+  const result = await dialog.showSaveDialog({
+    title: 'Export EvalOps Memory',
+    defaultPath: `kestrel-evalops-memory-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePath) {
+    return { cancelled: true, count: 0 }
+  }
+
+  const memories = await listKestrelSyncedMemories()
+  const config = getEvalOpsConfig()
+  await fs.writeFile(result.filePath, JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    source: 'kestrel',
+    agentId: config.agentId,
+    types: SYNCED_MEMORY_TYPES,
+    memories
+  }, null, 2), 'utf8')
+
+  return { filePath: result.filePath, count: memories.length }
+}
+
+export async function wipeEvalOpsMemorySyncCloudCopy(): Promise<EvalOpsMemorySyncWipeResponse> {
+  const memories = await listKestrelSyncedMemories()
+  clearEvalOpsMemorySyncQueue()
+  let deleted = 0
+  const failed: Array<{ id: string; error: string }> = []
+
+  for (const memory of memories) {
+    if (!memory.id) continue
+    try {
+      await deleteEvalOpsMemory({ id: memory.id })
+      deleted++
+    } catch (err) {
+      failed.push({ id: memory.id, error: errorMessage(err) })
+    }
+  }
+
+  return { deleted, failed }
+}
+
 async function drainEvalOpsMemorySyncQueue(force: boolean): Promise<void> {
   const db = getDatabase()
   const jobs = force
@@ -211,6 +269,33 @@ async function drainEvalOpsMemorySyncQueue(force: boolean): Promise<void> {
       console.warn('[evalops:memory] Queued memory sync still failing:', err)
     }
   }
+}
+
+async function listKestrelSyncedMemories(): Promise<EvalOpsMemory[]> {
+  const config = getEvalOpsConfig()
+  const memories: EvalOpsMemory[] = []
+  const limit = 100
+
+  for (const type of SYNCED_MEMORY_TYPES) {
+    let offset = 0
+    for (;;) {
+      const response = await listEvalOpsMemory({
+        scope: 'SCOPE_USER',
+        type,
+        agentId: config.agentId,
+        limit,
+        offset
+      })
+      if ((response as { offline?: boolean }).offline) {
+        throw new Error('evalops_memory_offline')
+      }
+      memories.push(...response.memories)
+      if (!response.hasMore && response.memories.length < limit) break
+      offset += limit
+    }
+  }
+
+  return memories
 }
 
 async function runMemorySyncJob(category: MemorySyncCategory, itemId: string, audioPath?: string): Promise<void> {
@@ -282,6 +367,10 @@ function removeQueuedMemorySync(category: MemorySyncCategory, itemId: string): v
     .delete(schema.evalopsMemorySyncQueue)
     .where(eq(schema.evalopsMemorySyncQueue.id, queueId(category, itemId)))
     .run()
+}
+
+function clearEvalOpsMemorySyncQueue(): void {
+  getDatabase().delete(schema.evalopsMemorySyncQueue).run()
 }
 
 function isMemorySyncEnabled(category: MemorySyncCategory): boolean {

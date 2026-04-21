@@ -7,10 +7,14 @@ import type {
   EvalOpsIngestSpansResponse,
   EvalOpsAnnotateTraceQualityRequest,
   EvalOpsAnnotateTraceQualityResponse,
+  EvalOpsDeleteMemoryRequest,
+  EvalOpsDeleteMemoryResponse,
   EvalOpsListApprovalsRequest,
   EvalOpsListApprovalsResponse,
   EvalOpsListAgentsRequest,
   EvalOpsListAgentsResponse,
+  EvalOpsListMemoryRequest,
+  EvalOpsListMemoryResponse,
   EvalOpsListSkillsRequest,
   EvalOpsListSkillsResponse,
   EvalOpsListTracesRequest,
@@ -114,6 +118,27 @@ export async function storeEvalOpsMemory(request: EvalOpsStoreMemoryRequest): Pr
     pinned: request.pinned,
     isPolicy: request.isPolicy
   })
+}
+
+export async function listEvalOpsMemory(request: EvalOpsListMemoryRequest = {}): Promise<EvalOpsListMemoryResponse> {
+  const config = getEvalOpsConfig()
+  const client = await getEvalOpsConsumerClient()
+  return client.memory.list({
+    scope: request.scope ?? 'SCOPE_USER',
+    projectId: request.projectId,
+    teamId: request.teamId,
+    repository: request.repository,
+    agent: request.agent,
+    type: request.type,
+    agentId: request.agentId ?? config.agentId,
+    limit: request.limit ?? 100,
+    offset: request.offset ?? 0
+  })
+}
+
+export async function deleteEvalOpsMemory(request: EvalOpsDeleteMemoryRequest): Promise<EvalOpsDeleteMemoryResponse> {
+  const client = await getEvalOpsConsumerClient()
+  return client.memory.deleteMemory({ id: request.id })
 }
 
 export async function listEvalOpsApprovals(request: EvalOpsListApprovalsRequest = {}): Promise<EvalOpsListApprovalsResponse> {

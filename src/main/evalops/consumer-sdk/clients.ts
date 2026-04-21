@@ -16,6 +16,10 @@ import type {
   IngestSpansResponse,
   JsonObject,
   JsonValue,
+  MemoryDeleteRequest,
+  MemoryDeleteResponse,
+  MemoryListRequest,
+  MemoryListResponse,
   MemoryRecallRequest,
   MemoryRecallResponse,
   MemoryRecord,
@@ -84,6 +88,34 @@ export class MemoryClient {
       body: memory,
       signal: options?.signal,
       fallback: (reason) => ({ ...offline(reason) })
+    })
+  }
+
+  list(
+    request: MemoryListRequest = {},
+    options?: { signal?: AbortSignal }
+  ): Promise<MemoryListResponse> {
+    return this.transport.request({
+      service: 'memory',
+      operation: 'list',
+      path: '/memory.v1.MemoryService/List',
+      body: request,
+      signal: options?.signal,
+      fallback: (reason) => ({ memories: [], total: 0, hasMore: false, ...offline(reason) })
+    })
+  }
+
+  deleteMemory(
+    request: MemoryDeleteRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<MemoryDeleteResponse> {
+    return this.transport.request({
+      service: 'memory',
+      operation: 'delete',
+      path: '/memory.v1.MemoryService/Delete',
+      body: request,
+      signal: options?.signal,
+      fallback: noContent
     })
   }
 }

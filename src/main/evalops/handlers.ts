@@ -2,15 +2,19 @@ import { ipcMain } from 'electron'
 import { getEvalOpsAuthStatus, loginEvalOps, logoutEvalOps } from './auth'
 import { registerKestrelAgentInBackground } from './registration'
 import {
+  exportEvalOpsMemorySyncCloudCopy,
   flushEvalOpsMemorySyncQueue,
-  getEvalOpsMemorySyncQueueStatus
+  getEvalOpsMemorySyncQueueStatus,
+  wipeEvalOpsMemorySyncCloudCopy
 } from './memory-sync'
 import {
   annotateEvalOpsTraceQuality,
+  deleteEvalOpsMemory,
   getEvalOpsServicesStatus,
   ingestEvalOpsSpans,
   listEvalOpsAgents,
   listEvalOpsApprovals,
+  listEvalOpsMemory,
   listEvalOpsSkills,
   listEvalOpsTraces,
   recallEvalOpsMemory,
@@ -24,10 +28,12 @@ import type {
   EvalOpsIngestSpansRequest,
   EvalOpsListApprovalsRequest,
   EvalOpsListAgentsRequest,
+  EvalOpsListMemoryRequest,
   EvalOpsListSkillsRequest,
   EvalOpsListTracesRequest,
   EvalOpsLoginOptions,
   EvalOpsRecallMemoryRequest,
+  EvalOpsDeleteMemoryRequest,
   EvalOpsRecordArenaTraceRequest,
   EvalOpsRecordArenaVoteRequest,
   EvalOpsSearchSkillsRequest,
@@ -54,6 +60,8 @@ export function registerEvalOpsHandlers(): void {
     await flushEvalOpsMemorySyncQueue({ force: true })
     return getEvalOpsMemorySyncQueueStatus()
   })
+  ipcMain.handle('evalops:memorySync:exportCloudCopy', async () => exportEvalOpsMemorySyncCloudCopy())
+  ipcMain.handle('evalops:memorySync:wipeCloudCopy', async () => wipeEvalOpsMemorySyncCloudCopy())
   ipcMain.handle('evalops:agents:list', async (_event, request?: EvalOpsListAgentsRequest) => {
     return listEvalOpsAgents(request)
   })
@@ -66,8 +74,14 @@ export function registerEvalOpsHandlers(): void {
   ipcMain.handle('evalops:memory:recall', async (_event, request: EvalOpsRecallMemoryRequest) => {
     return recallEvalOpsMemory(request)
   })
+  ipcMain.handle('evalops:memory:list', async (_event, request?: EvalOpsListMemoryRequest) => {
+    return listEvalOpsMemory(request)
+  })
   ipcMain.handle('evalops:memory:store', async (_event, request: EvalOpsStoreMemoryRequest) => {
     return storeEvalOpsMemory(request)
+  })
+  ipcMain.handle('evalops:memory:delete', async (_event, request: EvalOpsDeleteMemoryRequest) => {
+    return deleteEvalOpsMemory(request)
   })
   ipcMain.handle('evalops:approvals:list', async (_event, request?: EvalOpsListApprovalsRequest) => {
     return listEvalOpsApprovals(request)
