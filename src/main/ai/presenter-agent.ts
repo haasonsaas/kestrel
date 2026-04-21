@@ -36,7 +36,10 @@ import type { MCPServerManager } from '../mcp/manager'
 import type { ChatRequest } from '../../shared/ipc'
 import { recordEvalOpsChatTrace } from '../evalops/services'
 import { KESTREL_PROMPT_NAMES, resolveEvalOpsPrompt } from '../evalops/prompts'
-import { syncChatThreadMemoryInBackground } from '../evalops/memory-sync'
+import {
+  buildEvalOpsMemoryRecallBlock,
+  syncChatThreadMemoryInBackground
+} from '../evalops/memory-sync'
 
 let contextKitRef: ContextKitClient | null = null
 
@@ -175,7 +178,11 @@ async function buildConversation(
 
   // System prompt — Presenter decides the AI's identity and tone
   const basePrompt = await resolveEvalOpsPrompt(KESTREL_PROMPT_NAMES.chat, DEFAULT_CHAT_SYSTEM_PROMPT)
-  const systemPrompt = buildSystemMessage(execCtx.contextResult, execCtx.mcpToolsBlock, basePrompt)
+  let systemPrompt = buildSystemMessage(execCtx.contextResult, execCtx.mcpToolsBlock, basePrompt)
+  const memoryBlock = await buildRelevantMemoryBlock(request.messages)
+  if (memoryBlock) {
+    systemPrompt += `\n\n${memoryBlock}`
+  }
   messages.push({ role: 'system', content: systemPrompt })
 
   // Conversation history (skip renderer-side system messages)
@@ -189,6 +196,20 @@ async function buildConversation(
   }
 
   return messages
+}
+
+async function buildRelevantMemoryBlock(messages: Array<{ role: string; content: string }>): Promise<string | null> {
+  const query = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user' && message.content.trim().length > 0)
+    ?.content
+  if (!query) return null
+  try {
+    return await buildEvalOpsMemoryRecallBlock(query)
+  } catch (err) {
+    console.warn('[evalops:memory] Failed to recall memory for chat context:', err)
+    return null
+  }
 }
 
 /**
