@@ -180,6 +180,18 @@ export interface MemoryRecallRequest extends JsonObject {
   reviewStatus?: string
 }
 
+export interface MemoryListRequest extends JsonObject {
+  scope?: string
+  projectId?: string
+  teamId?: string
+  repository?: string
+  agent?: string
+  type?: string
+  agentId?: string
+  limit?: number
+  offset?: number
+}
+
 export interface MemoryRecallResponse extends JsonObject {
   results: Array<{ memory?: MemoryRecord; similarity?: number; graphDistance?: number }>
 }
@@ -187,6 +199,18 @@ export interface MemoryRecallResponse extends JsonObject {
 export interface MemoryStoreResponse extends JsonObject {
   memory?: MemoryRecord
 }
+
+export interface MemoryListResponse extends JsonObject {
+  memories: MemoryRecord[]
+  total?: number
+  hasMore?: boolean
+}
+
+export interface MemoryDeleteRequest extends JsonObject {
+  id: string
+}
+
+export interface MemoryDeleteResponse extends JsonObject {}
 
 export interface ApprovalRequestRecord extends JsonObject {
   id?: string

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Check, LogIn, LogOut, RefreshCw, Save } from 'lucide-react'
+import { AlertCircle, Check, Download, LogIn, LogOut, RefreshCw, Save, Trash2 } from 'lucide-react'
 import {
   EVALOPS_DEFAULT_AGENT_ID,
   EVALOPS_DEFAULT_AGENT_REGISTRY_BASE_URL,
@@ -15,7 +15,13 @@ import {
   EVALOPS_DEFAULT_TRACES_BASE_URL,
   EVALOPS_DEFAULT_WORKSPACE_ID
 } from '@shared/config'
-import type { EvalOpsAuthStatus, EvalOpsMemorySyncQueueStatus, EvalOpsServiceStatus } from '@shared/ipc'
+import type {
+  EvalOpsAuthStatus,
+  EvalOpsMemorySyncExportResponse,
+  EvalOpsMemorySyncQueueStatus,
+  EvalOpsMemorySyncWipeResponse,
+  EvalOpsServiceStatus
+} from '@shared/ipc'
 
 interface StoredEvalOpsConfig {
   identityBaseUrl?: string
@@ -240,6 +246,43 @@ export function EvalOpsSettings() {
     setError(null)
     try {
       setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:flush'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const exportMemoryCloudCopy = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await window.api.invoke('evalops:memorySync:exportCloudCopy') as EvalOpsMemorySyncExportResponse
+      if (!result.cancelled) {
+        setMessage(`Exported ${result.count} memory ${result.count === 1 ? 'record' : 'records'}.`)
+        setTimeout(() => setMessage(null), 2000)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const wipeMemoryCloudCopy = useCallback(async () => {
+    const confirmed = window.confirm('Delete the Kestrel cloud copy from EvalOps Memory? Local Kestrel data stays on this Mac.')
+    if (!confirmed) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await window.api.invoke('evalops:memorySync:wipeCloudCopy') as EvalOpsMemorySyncWipeResponse
+      setMemoryQueueStatus(await window.api.invoke('evalops:memorySync:status'))
+      if (result.failed.length > 0) {
+        setError(`Deleted ${result.deleted}; ${result.failed.length} memories could not be deleted.`)
+      } else {
+        setMessage(`Deleted ${result.deleted} cloud ${result.deleted === 1 ? 'memory' : 'memories'}.`)
+        setTimeout(() => setMessage(null), 2000)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -482,6 +525,24 @@ export function EvalOpsSettings() {
                 </button>
               </div>
             )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={exportMemoryCloudCopy}
+                disabled={busy || (!status?.authenticated && !tokenConfigured)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export Cloud Copy
+              </button>
+              <button
+                onClick={wipeMemoryCloudCopy}
+                disabled={busy || (!status?.authenticated && !tokenConfigured)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-500/30 text-sm text-red-600 hover:bg-red-500/5 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Wipe Cloud Copy
+              </button>
+            </div>
           </div>
         </div>
 

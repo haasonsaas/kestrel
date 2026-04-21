@@ -14,11 +14,15 @@ export type IpcChannels = {
   'evalops:servicesStatus': { args: []; return: EvalOpsServiceStatus[] }
   'evalops:memorySync:status': { args: []; return: EvalOpsMemorySyncQueueStatus }
   'evalops:memorySync:flush': { args: []; return: EvalOpsMemorySyncQueueStatus }
+  'evalops:memorySync:exportCloudCopy': { args: []; return: EvalOpsMemorySyncExportResponse }
+  'evalops:memorySync:wipeCloudCopy': { args: []; return: EvalOpsMemorySyncWipeResponse }
   'evalops:agents:list': { args: [request?: EvalOpsListAgentsRequest]; return: EvalOpsListAgentsResponse }
   'evalops:skills:list': { args: [request?: EvalOpsListSkillsRequest]; return: EvalOpsListSkillsResponse }
   'evalops:skills:search': { args: [request: EvalOpsSearchSkillsRequest]; return: EvalOpsListSkillsResponse }
   'evalops:memory:recall': { args: [request: EvalOpsRecallMemoryRequest]; return: EvalOpsRecallMemoryResponse }
+  'evalops:memory:list': { args: [request?: EvalOpsListMemoryRequest]; return: EvalOpsListMemoryResponse }
   'evalops:memory:store': { args: [request: EvalOpsStoreMemoryRequest]; return: EvalOpsStoreMemoryResponse }
+  'evalops:memory:delete': { args: [request: EvalOpsDeleteMemoryRequest]; return: EvalOpsDeleteMemoryResponse }
   'evalops:approvals:list': { args: [request?: EvalOpsListApprovalsRequest]; return: EvalOpsListApprovalsResponse }
   'evalops:traces:list': { args: [request?: EvalOpsListTracesRequest]; return: EvalOpsListTracesResponse }
   'evalops:traces:ingest': { args: [request: EvalOpsIngestSpansRequest]; return: EvalOpsIngestSpansResponse }
@@ -375,6 +379,22 @@ export interface EvalOpsStoreMemoryRequest {
   isPolicy?: boolean
 }
 
+export interface EvalOpsListMemoryRequest {
+  scope?: string
+  projectId?: string
+  teamId?: string
+  repository?: string
+  agent?: string
+  type?: string
+  agentId?: string
+  limit?: number
+  offset?: number
+}
+
+export interface EvalOpsDeleteMemoryRequest {
+  id: string
+}
+
 export interface EvalOpsMemory {
   id?: string
   scope?: string
@@ -401,11 +421,30 @@ export interface EvalOpsStoreMemoryResponse {
   memory?: EvalOpsMemory
 }
 
+export interface EvalOpsListMemoryResponse {
+  memories: EvalOpsMemory[]
+  total?: number
+  hasMore?: boolean
+}
+
+export interface EvalOpsDeleteMemoryResponse {}
+
 export interface EvalOpsMemorySyncQueueStatus {
   pending: number
   failed: number
   nextAttemptAt?: string
   lastError?: string
+}
+
+export interface EvalOpsMemorySyncExportResponse {
+  cancelled?: boolean
+  filePath?: string
+  count: number
+}
+
+export interface EvalOpsMemorySyncWipeResponse {
+  deleted: number
+  failed: Array<{ id: string; error: string }>
 }
 
 export interface EvalOpsApprovalRequest {
