@@ -26,6 +26,7 @@ export type EventType =
   | 'meeting_summarize'
   | 'context_capture'
   | 'context_snapshot'
+  | 'pii_redaction'
   | 'mcp_tool_call'
   | 'mcp_server_start'
   | 'mcp_server_stop'

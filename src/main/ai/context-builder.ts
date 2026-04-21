@@ -1,5 +1,11 @@
 import { ContextKitClient } from '../native/contextkit-client'
 import { shouldExcludeContext } from '../privacy/rules'
+import {
+  hasPiiRedactions,
+  piiSummaryLabel,
+  redactPiiForPlatform,
+  type PiiRedactionSummary
+} from '../privacy/pii'
 import { parseContext } from '../parsers'
 import type { ParsedContext, ParsedConversation, ParsedMessage } from '../parsers/types'
 import { USER } from '../parsers/types'
@@ -10,6 +16,7 @@ export interface ContextPromptResult {
   block: string
   hasVisibleText: boolean
   appName: string
+  piiRedactions?: PiiRedactionSummary
 }
 
 /**
@@ -98,14 +105,19 @@ export async function buildContextPrompt(
   const hasVisibleText =
     parsed !== null || (context.visibleText?.length ?? 0) > 0
 
-  console.log(`[context-builder] Built context: ${context.appName} — ${parts.join('\n').length} chars, parsed=${!!parsed}`)
-
   parts.push(`</active_context>`)
+  const redacted = redactPiiForPlatform(parts.join('\n'), 'screen_context', {
+    app_name: context.appName,
+    parsed_context: parsed !== null
+  })
+
+  console.log(`[context-builder] Built context: ${context.appName} — ${redacted.text.length} chars, parsed=${!!parsed}, pii=${redacted.summary.total}`)
 
   return {
-    block: parts.join('\n'),
+    block: redacted.text,
     hasVisibleText,
-    appName: context.appName
+    appName: context.appName,
+    piiRedactions: redacted.summary
   }
 }
 
@@ -332,6 +344,10 @@ Screen context follows.`
 
   if (contextResult) {
     prompt += `\n\nThe user's current screen context is:\n${contextResult.block}`
+    if (hasPiiRedactions(contextResult.piiRedactions)) {
+      const label = piiSummaryLabel(contextResult.piiRedactions)
+      prompt += `\n\nPrivacy notice: ${contextResult.piiRedactions.total} PII span(s) were redacted from captured screen context before this request left the device${label ? ` (${label})` : ''}.`
+    }
 
     if (!contextResult.hasVisibleText) {
       // No visible text — could be:
