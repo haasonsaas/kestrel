@@ -8,6 +8,7 @@ import { transcribeAudio } from './transcriber'
 import { summarizeMeeting } from './summarizer'
 import type { ContextKitClient } from '../native/contextkit-client'
 import type { MeetingStatus } from '../../shared/ipc'
+import { syncMeetingSummaryMemoryInBackground } from '../evalops/memory-sync'
 
 let contextKitRef: ContextKitClient | null = null
 
@@ -213,6 +214,7 @@ async function transcribeAndSummarize(
         .set({ summary })
         .where(eq(schema.meetings.id, meetingId))
         .run()
+      syncMeetingSummaryMemoryInBackground(meetingId, audioPath)
       console.log(`[meeting] Summary generated: ${summary.length} chars`)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
