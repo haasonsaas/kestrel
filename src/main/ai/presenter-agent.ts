@@ -36,6 +36,7 @@ import type { MCPServerManager } from '../mcp/manager'
 import type { ChatRequest } from '../../shared/ipc'
 import { recordEvalOpsChatTrace } from '../evalops/services'
 import { KESTREL_PROMPT_NAMES, resolveEvalOpsPrompt } from '../evalops/prompts'
+import { syncChatThreadMemoryInBackground } from '../evalops/memory-sync'
 
 let contextKitRef: ContextKitClient | null = null
 
@@ -230,6 +231,7 @@ function finalize(
 
   // Auto-title thread from first user message
   autoTitle(request.threadId, request.messages)
+  syncChatThreadMemoryInBackground(request.threadId)
 }
 
 function autoTitle(

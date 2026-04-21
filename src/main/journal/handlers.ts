@@ -4,6 +4,7 @@ import { v4 as uuid } from 'uuid'
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { eq } from 'drizzle-orm'
+import { syncJournalEntryMemoryInBackground } from '../evalops/memory-sync'
 
 export function registerJournalHandlers(): void {
   ipcMain.handle('journal:generate', async (_e, date: string) => {
@@ -33,6 +34,7 @@ export function registerJournalHandlers(): void {
     }
 
     db.insert(schema.journalEntries).values(entry).run()
+    syncJournalEntryMemoryInBackground(date)
     return entry
   })
 }

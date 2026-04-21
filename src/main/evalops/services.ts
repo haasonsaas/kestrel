@@ -98,6 +98,7 @@ export async function storeEvalOpsMemory(request: EvalOpsStoreMemoryRequest): Pr
   const config = getEvalOpsConfig()
   const client = await getEvalOpsConsumerClient()
   return client.memory.store({
+    id: request.id,
     scope: request.scope ?? 'SCOPE_USER',
     content: request.content,
     type: request.type,

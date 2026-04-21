@@ -39,6 +39,15 @@ interface StoredEvalOpsConfig {
   }
 }
 
+interface StoredEvalOpsMemorySync {
+  enabled?: boolean
+  chat?: boolean
+  meetings?: boolean
+  journal?: boolean
+}
+
+const EVALOPS_MEMORY_SYNC_SETTING_KEY = 'evalops_memory_sync'
+
 export function EvalOpsSettings() {
   const [status, setStatus] = useState<EvalOpsAuthStatus | null>(null)
   const [identityBaseUrl, setIdentityBaseUrl] = useState(EVALOPS_DEFAULT_IDENTITY_BASE_URL)
@@ -58,6 +67,10 @@ export function EvalOpsSettings() {
   const [providerEnvironment, setProviderEnvironment] = useState(EVALOPS_DEFAULT_PROVIDER_REF.environment)
   const [providerCredentialName, setProviderCredentialName] = useState(EVALOPS_DEFAULT_PROVIDER_REF.credentialName)
   const [providerTeamId, setProviderTeamId] = useState(EVALOPS_DEFAULT_PROVIDER_REF.teamId)
+  const [memorySyncEnabled, setMemorySyncEnabled] = useState(false)
+  const [memorySyncChat, setMemorySyncChat] = useState(false)
+  const [memorySyncMeetings, setMemorySyncMeetings] = useState(false)
+  const [memorySyncJournal, setMemorySyncJournal] = useState(false)
   const [serviceStatuses, setServiceStatuses] = useState<EvalOpsServiceStatus[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -68,6 +81,7 @@ export function EvalOpsSettings() {
 
   const load = useCallback(async () => {
     const stored = await window.api.invoke('settings:get', 'evalops_config') as StoredEvalOpsConfig | null
+    const memorySync = await window.api.invoke('settings:get', EVALOPS_MEMORY_SYNC_SETTING_KEY) as StoredEvalOpsMemorySync | null
     if (stored?.identityBaseUrl) setIdentityBaseUrl(stored.identityBaseUrl)
     if (stored?.baseUrl) setBaseUrl(stored.baseUrl)
     if (stored?.llmGatewayBaseUrl) setLlmGatewayBaseUrl(stored.llmGatewayBaseUrl)
@@ -85,6 +99,10 @@ export function EvalOpsSettings() {
     if (stored?.providerRef?.environment) setProviderEnvironment(stored.providerRef.environment)
     if (stored?.providerRef?.credentialName) setProviderCredentialName(stored.providerRef.credentialName)
     if (stored?.providerRef?.teamId) setProviderTeamId(stored.providerRef.teamId)
+    setMemorySyncEnabled(memorySync?.enabled === true)
+    setMemorySyncChat(memorySync?.chat === true)
+    setMemorySyncMeetings(memorySync?.meetings === true)
+    setMemorySyncJournal(memorySync?.journal === true)
     setStatus(await window.api.invoke('evalops:authStatus'))
   }, [])
 
@@ -117,6 +135,12 @@ export function EvalOpsSettings() {
           teamId: providerTeamId.trim()
         }
       })
+      await window.api.invoke('settings:set', EVALOPS_MEMORY_SYNC_SETTING_KEY, {
+        enabled: memorySyncEnabled,
+        chat: memorySyncChat,
+        meetings: memorySyncMeetings,
+        journal: memorySyncJournal
+      })
       setStatus(await window.api.invoke('evalops:authStatus'))
       setMessage('Saved EvalOps settings.')
       setTimeout(() => setMessage(null), 2000)
@@ -133,6 +157,10 @@ export function EvalOpsSettings() {
     identityBaseUrl,
     llmGatewayBaseUrl,
     memoryBaseUrl,
+    memorySyncChat,
+    memorySyncEnabled,
+    memorySyncJournal,
+    memorySyncMeetings,
     parsedScopes,
     provider,
     providerCredentialName,
@@ -374,6 +402,42 @@ export function EvalOpsSettings() {
         </div>
 
         <div className="space-y-4 border-t border-border pt-5">
+          <div>
+            <h4 className="text-sm font-medium mb-1">Memory Sync</h4>
+            <p className="text-xs text-muted-foreground">
+              Selected chat, meeting, and journal content is stored in EvalOps Memory and leaves this Mac when enabled.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <CheckboxSetting
+              label="Sync selected local data to EvalOps Memory"
+              checked={memorySyncEnabled}
+              onChange={setMemorySyncEnabled}
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <CheckboxSetting
+                label="Chat"
+                checked={memorySyncChat}
+                onChange={setMemorySyncChat}
+                disabled={!memorySyncEnabled}
+              />
+              <CheckboxSetting
+                label="Meetings"
+                checked={memorySyncMeetings}
+                onChange={setMemorySyncMeetings}
+                disabled={!memorySyncEnabled}
+              />
+              <CheckboxSetting
+                label="Journal"
+                checked={memorySyncJournal}
+                onChange={setMemorySyncJournal}
+                disabled={!memorySyncEnabled}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 border-t border-border pt-5">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h4 className="text-sm font-medium mb-1">Platform Services</h4>
@@ -435,6 +499,31 @@ export function EvalOpsSettings() {
         )}
       </div>
     </div>
+  )
+}
+
+function CheckboxSetting({
+  label,
+  checked,
+  onChange,
+  disabled = false
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <label className={`flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm ${disabled ? 'opacity-50' : ''}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 accent-primary"
+      />
+      <span>{label}</span>
+    </label>
   )
 }
 

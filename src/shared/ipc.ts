@@ -356,6 +356,7 @@ export interface EvalOpsRecallMemoryRequest {
 }
 
 export interface EvalOpsStoreMemoryRequest {
+  id?: string
   scope?: string
   content: string
   type: string

@@ -4,6 +4,10 @@ import { eq, desc } from 'drizzle-orm'
 import { getDatabase } from '../db'
 import * as schema from '../db/schema'
 import { getAllSettingValues, getSettingValue, setSettingValue } from '../evalops/settings'
+import {
+  syncChatThreadMemoryInBackground,
+  syncJournalEntryMemoryInBackground
+} from '../evalops/memory-sync'
 import type {
   Thread, Message, CreateMessage,
   Meeting, CreateMeeting,
@@ -86,6 +90,7 @@ export function registerIpcHandlers(): void {
       .set({ updatedAt: new Date(now) })
       .where(eq(schema.threads.id, data.threadId))
       .run()
+    syncChatThreadMemoryInBackground(data.threadId)
     return { ...message, createdAt: now } as Message
   })
 
@@ -138,6 +143,7 @@ export function registerIpcHandlers(): void {
         set: { title: data.title, tldr: data.tldr, content: data.content }
       })
       .run()
+    syncJournalEntryMemoryInBackground(data.date)
     return db.select().from(schema.journalEntries)
       .where(eq(schema.journalEntries.date, data.date)).get() as unknown as JournalEntry
   })
