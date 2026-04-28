@@ -26,7 +26,7 @@
     "test": "node tests/contextkit-pipeline.test.mjs && node tests/meeting-detection.test.mjs && node tests/audio-data-size.test.mjs"
   },
   "dependencies": {
-    "@ax-llm/ax": "^19.0.45",
+    "@ax-llm/ax": "^20.0.0",
     "@electron-toolkit/utils": "^4.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-dialog": "^1.1.4",
