@@ -63,7 +63,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.1",
+    "@electron/rebuild": "^4.0.4",
     "@tailwindcss/vite": "^4.2.4",
     "@types/better-sqlite3": "^7.6.12",
     "@types/react": "^19.0.0",
