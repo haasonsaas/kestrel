@@ -1,3 +1,7 @@
+import {
+  buildEvalOpsConsumerHeaders,
+  buildEvalOpsServiceBaseUrls
+} from '../../../sdk/js/src/index'
 import { getEvalOpsBearerToken, getStoredEvalOpsSession } from './auth'
 import { getEvalOpsConfig } from './config'
 import { EvalOpsClient } from './consumer-sdk'
@@ -8,30 +12,23 @@ export async function getEvalOpsConsumerClient(): Promise<EvalOpsClient> {
   const session = getStoredEvalOpsSession()
   return new EvalOpsClient({
     baseUrl: config.baseUrl,
-    serviceBaseUrls: {
-      'agent-registry': config.agentRegistryBaseUrl,
-      approvals: config.approvalsBaseUrl,
-      prompts: config.promptsBaseUrl,
-      memory: config.memoryBaseUrl,
-      skills: config.skillsBaseUrl,
-      traces: config.tracesBaseUrl
-    },
+    serviceBaseUrls: buildEvalOpsServiceBaseUrls({
+      agentRegistryBaseUrl: config.agentRegistryBaseUrl,
+      approvalsBaseUrl: config.approvalsBaseUrl,
+      promptsBaseUrl: config.promptsBaseUrl,
+      memoryBaseUrl: config.memoryBaseUrl,
+      skillsBaseUrl: config.skillsBaseUrl,
+      tracesBaseUrl: config.tracesBaseUrl
+    }),
     token,
-    headers: cleanHeaders({
-      'X-Organization-ID': session?.organizationId,
-      'X-Workspace-ID': config.workspaceId
+    headers: buildEvalOpsConsumerHeaders({
+      organizationId: session?.organizationId,
+      workspaceId: config.workspaceId,
+      agentId: config.agentId
     }),
     featureFlags: {
       kestrel: true
     },
     offlineFallback: false
   })
-}
-
-function cleanHeaders(headers: Record<string, string | undefined>): Record<string, string> {
-  const result: Record<string, string> = {}
-  for (const [key, value] of Object.entries(headers)) {
-    if (value) result[key] = value
-  }
-  return result
 }

@@ -16,6 +16,7 @@
     }
   },
   "include": [
+    "sdk/js/src/**/*.ts",
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
