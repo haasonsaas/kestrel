@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "paths": {
+      "@evalops/kestrel-sdk": ["./src/index.ts"]
+    },
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "examples/**/*.ts"]
+}

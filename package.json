@@ -15,7 +15,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "sdk:build": "npm --prefix sdk/js run build && cargo build -p kestrel-sdk",
+    "sdk:build": "npm --prefix sdk/js run build && npm --prefix sdk/js run typecheck:examples && cargo build -p kestrel-sdk",
     "sdk:package": "npm --prefix sdk/js run pack:dry && cargo package -p kestrel-sdk --allow-dirty",
     "sdk:publish:npm": "npm --prefix sdk/js run publish:npm",
     "sdk:publish:crate": "cargo publish -p kestrel-sdk",
