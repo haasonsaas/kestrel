@@ -217,7 +217,7 @@ export function buildEvalOpsConsumerClientConfig(
   return {
     baseUrl: cleanUrl(endpoints.baseUrl, DEFAULT_EVALOPS_BASE_URL),
     serviceBaseUrls: buildEvalOpsServiceBaseUrls(endpoints),
-    token: cleanOptional(input.token),
+    token: cleanOptionalString(input.token),
     headers: buildEvalOpsConsumerHeaders({
       organizationId: input.organizationId,
       workspaceId: input.workspaceId,
@@ -268,6 +268,14 @@ function cleanEvalOpsServiceBaseUrls(
 
 function cleanUrl(...values: Array<string | undefined>): string {
   return cleanOptional(...values) ?? ''
+}
+
+function cleanOptionalString(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim()
+    if (trimmed) return trimmed
+  }
+  return undefined
 }
 
 function cleanOptional(...values: Array<string | undefined>): string | undefined {
