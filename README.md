@@ -56,6 +56,8 @@ All data (chat threads, meetings, journal entries, settings) is stored locally i
 
 ## Quick Start
 
+Requires Node.js 22.12.0 or newer. Use the checked-in `.node-version` with your version manager.
+
 ```bash
 # Install dependencies
 npm install

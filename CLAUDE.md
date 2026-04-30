@@ -3,6 +3,8 @@
 Personal AI desktop assistant for macOS. Inspired by Littlebird.
 
 ## Quick Start
+Requires Node.js 22.12.0 or newer.
+
 ```bash
 npm install
 npm run contextkit:build  # Build native Swift helper
