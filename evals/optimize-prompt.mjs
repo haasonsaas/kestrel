@@ -10,7 +10,7 @@
  * Run: OPENROUTER_KEY=sk-or-... node evals/optimize-prompt.mjs
  */
 
-import { AxAI, AxMiPRO } from '@ax-llm/ax'
+import { AxAI } from '@ax-llm/ax'
 
 const API_KEY = process.env.OPENROUTER_KEY
 if (!API_KEY) {
