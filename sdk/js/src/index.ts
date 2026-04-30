@@ -260,27 +260,27 @@ function cleanEvalOpsServiceBaseUrls(
 ): Partial<Record<EvalOpsConsumerServiceName, string>> {
   const result: Partial<Record<EvalOpsConsumerServiceName, string>> = {}
   for (const [service, value] of Object.entries(services)) {
-    const cleaned = cleanOptional(value)
+    const cleaned = cleanOptionalUrl(value)
     if (cleaned) result[service as EvalOpsConsumerServiceName] = cleaned
   }
   return result
 }
 
 function cleanUrl(...values: Array<string | undefined>): string {
-  return cleanOptional(...values) ?? ''
+  return cleanOptionalUrl(...values) ?? ''
 }
 
-function cleanOptionalString(...values: Array<string | undefined>): string | undefined {
+function cleanOptionalUrl(...values: Array<string | undefined>): string | undefined {
   for (const value of values) {
-    const trimmed = value?.trim()
+    const trimmed = value?.trim().replace(/\/+$/u, '')
     if (trimmed) return trimmed
   }
   return undefined
 }
 
-function cleanOptional(...values: Array<string | undefined>): string | undefined {
+function cleanOptionalString(...values: Array<string | undefined>): string | undefined {
   for (const value of values) {
-    const trimmed = value?.trim().replace(/\/+$/u, '')
+    const trimmed = value?.trim()
     if (trimmed) return trimmed
   }
   return undefined
