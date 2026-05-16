@@ -7,12 +7,20 @@ INSTANCE="${INSTANCE:-bazel-rbe-dev-buildfarm}"
 LOCAL_PORT="${LOCAL_PORT:-8980}"
 REMOTE_PORT="${REMOTE_PORT:-8980}"
 CONFIG="${CONFIG:-remote-gcp-dev}"
+USE_EXISTING_TUNNEL="${BAZEL_RBE_USE_EXISTING_TUNNEL:-false}"
 
 if [[ $# -eq 0 ]]; then
-  set -- test //...
+  if [[ -n "${BAZEL_TARGETS:-}" ]]; then
+    read -r -a bazel_targets <<< "${BAZEL_TARGETS}"
+    set -- test "${bazel_targets[@]}"
+  else
+    set -- test //...
+  fi
 fi
 
-if pgrep -f "gcloud compute start-iap-tunnel ${INSTANCE} ${REMOTE_PORT}.*--local-host-port=localhost:${LOCAL_PORT}" >/dev/null; then
+if [[ "${USE_EXISTING_TUNNEL}" == "true" ]]; then
+  tunnel_pid=""
+elif pgrep -f "gcloud compute start-iap-tunnel ${INSTANCE} ${REMOTE_PORT}.*--local-host-port=localhost:${LOCAL_PORT}" >/dev/null; then
   tunnel_pid=""
 else
   gcloud compute start-iap-tunnel "${INSTANCE}" "${REMOTE_PORT}" \
