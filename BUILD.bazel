@@ -1,0 +1,27 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+package(default_visibility = ["//visibility:private"])
+
+filegroup(
+    name = "workspace_contract_files",
+    srcs = [
+        ".github/workflows/ci.yml",
+        ".node-version",
+        "Cargo.lock",
+        "Cargo.toml",
+        "electron.vite.config.ts",
+        "package.json",
+        "package-lock.json",
+        "sdk/js/package.json",
+        "sdk/rust/kestrel-sdk/Cargo.toml",
+        "tsconfig.json",
+        "tsconfig.node.json",
+        "tsconfig.web.json",
+    ],
+)
+
+sh_test(
+    name = "kestrel_bazel_contract_test",
+    srcs = ["tools/bazel/kestrel_bazel_contract_test.sh"],
+    data = [":workspace_contract_files"],
+)

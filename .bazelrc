@@ -1,0 +1,19 @@
+common --enable_bzlmod --announce_rc
+
+build --experimental_convenience_symlinks=ignore
+build --color=yes
+build --curses=yes
+build --show_timestamps
+build --test_output=errors
+
+test --test_output=errors
+
+build:remote-gcp-dev --remote_executor=grpc://127.0.0.1:8980
+build:remote-gcp-dev --remote_timeout=3600
+build:remote-gcp-dev --remote_download_toplevel
+build:remote-gcp-dev --remote_upload_local_results=true
+build:remote-gcp-dev --spawn_strategy=remote
+build:remote-gcp-dev --strategy=Genrule=remote
+build:remote-gcp-dev --jobs=32
+
+try-import %workspace%/.bazelrc.user
