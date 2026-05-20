@@ -68,19 +68,19 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
-    "@tailwindcss/vite": "^4.2.4",
+    "@tailwindcss/vite": "^4.3.0",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.2.0",
     "drizzle-kit": "^0.31.10",
-    "electron": "^41.5.0",
+    "electron": "^41.7.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^6.0.0-beta.1",
     "tailwindcss": "^4.1.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.12"
+    "vite": "^8.0.13"
   },
   "build": {
     "appId": "com.kestrel.app",
